@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cozinha Brasileira | Gestão Operacional</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { background-color: #0f0f0f; color: #f5f5f5; font-family: sans-serif; }
+    .btn-orange { background-color: #D95B1E; color: white; }
+    .btn-orange:hover { background-color: #c34e17; }
+    .text-orange { color: #D95B1E; }
+    .text-green { color: #4A6332; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const { createClient } = supabase;
+
+    // COLE AQUI SUAS CREDENCIAIS DO SUPABASE
+    const SUPABASE_URL = 'https://ddngvelrtqmfgaeqsjem.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_EhLCuypZr6vHrSKDCrHxQg_n7BvKxBU';
+    
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    function App() {
+      const [abaAtiva, setAbaAtiva] = useState('painel');
+      const [produtos, setProdutos] = useState([]);
+      const [lancamentos, setLancamentos] = useState([]);
+
+      const [novoLancamento, setNovoLancamento] = useState({
+        data: new Date().toISOString().split('T')[0],
+        tipo: 'Venda', produto_id: '', descricao: '', quantidade: 1, 
+        pagamento: 'Pix', canal_categoria: 'Delivery', valor_despesa: ''
+      });
+
+      const [novoProduto, setNovoProduto] = useState({
+        nome: '', preco_venda: '', custo_unitario: '', observacao: ''
+      });
+
+      useEffect(() => { carregarDados(); }, []);
+
+      async function carregarDados() {
+        const { data: prods } = await supabaseClient.from('produtos').select('*').order('nome');
+        const { data: lancs } = await supabaseClient.from('lancamentos').select('*').order('data', { ascending: false });
+        if (prods) setProdutos(prods);
+        if (lancs) setLancamentos(lancs);
+      }
+
+      const faturamento = lancamentos.filter(l => l.tipo === 'Venda').reduce((acc, curr) => acc + Number(curr.valor_total), 0);
+      const lucroProdutos = lancamentos.filter(l => l.tipo === 'Venda').reduce((acc, curr) => acc + (Number(curr.valor_total) - Number(curr.custo_total)), 0);
+      const totalDespesas = lancamentos.filter(l => l.tipo === 'Despesa').reduce((acc, curr) => acc + Number(curr.valor_total), 0);
+      const resultadoMes = lucroProdutos - totalDespesas;
+
+      async function handleSalvarLancamento(e) {
+        e.preventDefault();
+        let total = 0, custo = 0, desc = novoLancamento.descricao;
+        if (novoLancamento.tipo === 'Venda') {
+          const prod = produtos.find(p => p.id === novoLancamento.produto_id);
+          if (!prod) return alert('Selecione um produto.');
+          desc = prod.nome;
+          total = Number(prod.preco_venda) * Number(novoLancamento.quantidade);
+          custo = Number(prod.custo_unitario) * Number(novoLancamento.quantidade);
+        } else {
+          total = Number(novoLancamento.valor_despesa);
+        }
+        
+        const payload = {
+          data: novoLancamento.data, tipo: novoLancamento.tipo, descricao: desc,
+          produto_id: novoLancamento.tipo === 'Venda' ? novoLancamento.produto_id : null,
+          quantidade: novoLancamento.tipo === 'Venda' ? Number(novoLancamento.quantidade) : 1,
+          pagamento: novoLancamento.pagamento, canal_categoria: novoLancamento.canal_categoria,
+          valor_total: total, custo_total: custo,
+          resultado: novoLancamento.tipo === 'Venda' ? total - custo : -total
+        };
+
+        await supabaseClient.from('lancamentos').insert([payload]);
+        carregarDados();
+        setNovoLancamento({ ...novoLancamento, descricao: '', valor_despesa: '', quantidade: 1, produto_id: '' });
+      }
+
+      async function handleSalvarProduto(e) {
+        e.preventDefault();
+        const payload = {
+          nome: novoProduto.nome, preco_venda: parseFloat(novoProduto.preco_venda),
+          custo_unitario: parseFloat(novoProduto.custo_unitario), observacao: novoProduto.observacao
+        };
+        await supabaseClient.from('produtos').insert([payload]);
+        carregarDados();
+        setNovoProduto({ nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
+      }
+
+      return (
+        <div className="flex flex-col md:flex-row min-h-screen">
+          {/* Sidebar */}
+          <aside className="w-full md:w-64 bg-[#141414] border-r border-[#262626] p-6">
+            <div className="flex flex-col items-center text-center pb-6 border-b border-[#262626]">
+              <div className="w-20 h-20 rounded-full border-2 border-[#D95B1E] bg-[#0d0d0d] flex items-center justify-center p-2 mb-3 shadow-lg">
+                <div className="text-center">
+                  <span className="block text-green text-xs font-bold leading-tight uppercase">Cozinha</span>
+                  <span className="block text-orange text-xs font-black tracking-wider uppercase">Brasileira</span>
+                </div>
+              </div>
+              <h1 className="text-sm font-semibold tracking-wide text-[#f2ece4]">COZINHA BRASILEIRA</h1>
+            </div>
+            <nav className="mt-6 space-y-2">
+              <button onClick={() => setAbaAtiva('painel')} className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium ${abaAtiva === 'painel' ? 'btn-orange' : 'text-zinc-400 hover:bg-[#1f1f1f]'}`}>📊 Painel Geral</button>
+              <button onClick={() => setAbaAtiva('lancamentos')} className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium ${abaAtiva === 'lancamentos' ? 'btn-orange' : 'text-zinc-400 hover:bg-[#1f1f1f]'}`}>📝 Lançamentos</button>
+              <button onClick={() => setAbaAtiva('produtos')} className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium ${abaAtiva === 'produtos' ? 'btn-orange' : 'text-zinc-400 hover:bg-[#1f1f1f]'}`}>📦 Produtos & Custos</button>
+            </nav>
+          </aside>
+
+          {/* Conteúdo Principal */}
+          <main className="flex-1 p-6 md:p-10">
+            
+            {abaAtiva === 'painel' && (
+              <div>
+                <h2 className="text-2xl font-bold mb-6 text-white">Painel Gerencial</h2>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
+                  <div className="bg-[#171717] border border-[#262626] p-5 rounded-xl">
+                    <span className="text-xs text-zinc-400 uppercase">Faturamento</span>
+                    <p className="text-2xl font-bold mt-2">R$ {faturamento.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-[#171717] border border-[#262626] p-5 rounded-xl">
+                    <span className="text-xs text-zinc-400 uppercase">Lucro Produtos</span>
+                    <p className="text-2xl font-bold text-green mt-2">R$ {lucroProdutos.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-[#171717] border border-[#262626] p-5 rounded-xl">
+                    <span className="text-xs text-zinc-400 uppercase">Despesas</span>
+                    <p className="text-2xl font-bold text-red-500 mt-2">R$ {totalDespesas.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-[#171717] border border-[#262626] p-5 rounded-xl">
+                    <span className="text-xs text-zinc-400 uppercase">Resultado Mês</span>
+                    <p className={`text-2xl font-bold mt-2 ${resultadoMes >= 0 ? 'text-orange' : 'text-red-500'}`}>R$ {resultadoMes.toFixed(2)}</p>
+                  </div>
+                </div>
+                
+                <div className="bg-[#171717] border border-[#262626] rounded-xl p-6 overflow-x-auto">
+                  <h3 className="text-base font-semibold mb-4">Últimos Lançamentos</h3>
+                  <table className="w-full text-left text-sm text-zinc-400">
+                    <thead className="border-b border-[#262626]">
+                      <tr><th className="pb-3">Data</th><th className="pb-3">Tipo</th><th className="pb-3">Descrição</th><th className="pb-3">Canal</th><th className="pb-3 text-right">Valor</th></tr>
+                    </thead>
+                    <tbody>
+                      {lancamentos.slice(0, 5).map(l => (
+                        <tr key={l.id} className="border-b border-[#262626]">
+                          <td className="py-3">{l.data}</td>
+                          <td className="py-3">{l.tipo}</td>
+                          <td className="py-3 text-white">{l.descricao}</td>
+                          <td className="py-3">{l.canal_categoria}</td>
+                          <td className="py-3 text-right text-white">R$ {Number(l.valor_total).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {abaAtiva === 'lancamentos' && (
+              <div>
+                <h2 className="text-2xl font-bold mb-6 text-white">Novo Lançamento</h2>
+                <form onSubmit={handleSalvarLancamento} className="bg-[#171717] border border-[#262626] p-6 rounded-xl mb-10 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1">Tipo</label>
+                      <select value={novoLancamento.tipo} onChange={e => setNovoLancamento({...novoLancamento, tipo: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded p-2 text-white">
+                        <option>Venda</option><option>Despesa</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1">Data</label>
+                      <input type="date" value={novoLancamento.data} onChange={e => setNovoLancamento({...novoLancamento, data: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded p-2 text-white" required />
+                    </div>
+                    {novoLancamento.tipo === 'Venda' ? (
+                      <div>
+                        <label className="block text-xs text-zinc-400 mb-1">Produto</label>
+                        <select value={novoLancamento.produto_id} onChange={e => setNovoLancamento({...novoLancamento, produto_id: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded p-2 text-white" required>
+                          <option value="">Selecione...</option>
+                          {produtos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                        </select>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-xs text-zinc-400 mb-1">Descrição</label>
+                        <input type="text" value={novoLancamento.descricao} onChange={e => setNovoLancamento({...novoLancamento, descricao: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded p-2 text-white" required />
+                      </div>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {novoLancamento.tipo === 'Venda' ? (
+                      <div>
+                        <label className="block text-xs text-zinc-400 mb-1">Quantidade</label>
+                        <input type="number" min="1" value={novoLancamento.quantidade} onChange={e => setNovoLancamento({...novoLancamento, quantidade: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded p-2 text-white" required />
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-xs text-zinc-400 mb-1">Valor (R$)</label>
+                        <input type="number" step="0.01" value={novoLancamento.valor_despesa} onChange={e => setNovoLancamento({...novoLancamento, valor_despesa: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded p-2 text-white" required />
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1">Pagamento</label>
+                      <select value={novoLancamento.pagamento} onChange={e => setNovoLancamento({...novoLancamento, pagamento: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded p-2 text-white">
+                        <option>Pix</option><option>Cartão</option><option>Dinheiro</option><option>Transferência</option><option>Outro</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1">Categoria/Canal</label>
+                      <select value={novoLancamento.canal_categoria} onChange={e => setNovoLancamento({...novoLancamento, canal_categoria: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded p-2 text-white">
+                        <option>Delivery</option><option>Retirada</option><option>Evento</option><option>Insumos</option><option>Embalagens</option><option>Bebidas</option><option>Outros</option>
+                      </select>
+                    </div>
+                    <div className="flex items-end">
+                      <button type="submit" className="w-full btn-orange font-medium py-2 rounded">Registrar</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {abaAtiva === 'produtos' && (
+              <div>
+                <h2 className="text-2xl font-bold mb-6 text-white">Cadastro de Produtos</h2>
+                <form onSubmit={handleSalvarProduto} className="bg-[#171717] border border-[#262626] p-6 rounded-xl space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1">Nome</label>
+                      <input type="text" value={novoProduto.nome} onChange={e => setNovoProduto({...novoProduto, nome: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded p-2 text-white" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1">Preço (R$)</label>
+                      <input type="number" step="0.01" value={novoProduto.preco_venda} onChange={e => setNovoProduto({...novoProduto, preco_venda: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded p-2 text-white" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1">Custo (R$)</label>
+                      <input type="number" step="0.01" value={novoProduto.custo_unitario} onChange={e => setNovoProduto({...novoProduto, custo_unitario: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded p-2 text-white" required />
+                    </div>
+                    <div className="flex items-end">
+                      <button type="submit" className="w-full bg-[#4A6332] text-white font-medium py-2 rounded">Salvar Produto</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            )}
+
+          </main>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
