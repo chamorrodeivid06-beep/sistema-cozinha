@@ -4,11 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cozinha Brasileira | Gestão Operacional</title>
+  
+  <!-- Carregando Tailwind CSS para o design -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Carregando React -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  
+  <!-- Carregando Babel para traduzir o JSX no navegador -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Carregando Supabase de forma global -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
     body { background-color: #0f0f0f; color: #f5f5f5; font-family: sans-serif; }
     .btn-orange { background-color: #D95B1E; color: white; }
@@ -20,20 +29,22 @@
 <body>
   <div id="root"></div>
 
+  <!-- Note o type="text/babel" para que o Babel traduza o código React -->
   <script type="text/babel">
     const { useState, useEffect } = React;
-    const { createClient } = supabase;
-
+    
     // SUAS CREDENCIAIS DO SUPABASE INSERIDAS AQUI
     const SUPABASE_URL = 'https://ddngvelrtqmfgaeqsjem.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_EhLCuypZr6vHrSKDCrHxQg_n7BvKxBU';
     
-    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+    // Criando o cliente do Supabase usando a variável global 'supabase'
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     function App() {
       const [abaAtiva, setAbaAtiva] = useState('painel');
       const [produtos, setProdutos] = useState([]);
       const [lancamentos, setLancamentos] = useState([]);
+      const [carregando, setCarregando] = useState(true);
 
       const [novoLancamento, setNovoLancamento] = useState({
         data: new Date().toISOString().split('T')[0],
@@ -45,13 +56,25 @@
         nome: '', preco_venda: '', custo_unitario: '', observacao: ''
       });
 
-      useEffect(() => { carregarDados(); }, []);
+      useEffect(() => { 
+        carregarDados(); 
+      }, []);
 
       async function carregarDados() {
-        const { data: prods } = await supabaseClient.from('produtos').select('*').order('nome');
-        const { data: lancs } = await supabaseClient.from('lancamentos').select('*').order('data', { ascending: false });
-        if (prods) setProdutos(prods);
-        if (lancs) setLancamentos(lancs);
+        setCarregando(true);
+        try {
+          const { data: prods, error: errProds } = await supabaseClient.from('produtos').select('*').order('nome');
+          const { data: lancs, error: errLancs } = await supabaseClient.from('lancamentos').select('*').order('data', { ascending: false });
+          
+          if (errProds) console.error("Erro produtos:", errProds);
+          if (errLancs) console.error("Erro lançamentos:", errLancs);
+          
+          if (prods) setProdutos(prods);
+          if (lancs) setLancamentos(lancs);
+        } catch (error) {
+          console.error("Erro de conexão:", error);
+        }
+        setCarregando(false);
       }
 
       const faturamento = lancamentos.filter(l => l.tipo === 'Venda').reduce((acc, curr) => acc + Number(curr.valor_total), 0);
@@ -87,9 +110,13 @@
           fornecedor: novoLancamento.tipo === 'Despesa' ? novoLancamento.fornecedor : null
         };
 
-        await supabaseClient.from('lancamentos').insert([payload]);
-        carregarDados();
-        setNovoLancamento({ ...novoLancamento, descricao: '', valor_despesa: '', quantidade: 1, produto_id: '', fornecedor: '' });
+        const { error } = await supabaseClient.from('lancamentos').insert([payload]);
+        if(error) {
+            alert("Erro ao salvar: " + error.message);
+        } else {
+            carregarDados();
+            setNovoLancamento({ ...novoLancamento, descricao: '', valor_despesa: '', quantidade: 1, produto_id: '', fornecedor: '' });
+        }
       }
 
       async function handleSalvarProduto(e) {
@@ -98,9 +125,17 @@
           nome: novoProduto.nome, preco_venda: parseFloat(novoProduto.preco_venda),
           custo_unitario: parseFloat(novoProduto.custo_unitario), observacao: novoProduto.observacao
         };
-        await supabaseClient.from('produtos').insert([payload]);
-        carregarDados();
-        setNovoProduto({ nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
+        const { error } = await supabaseClient.from('produtos').insert([payload]);
+        if(error){
+             alert("Erro ao salvar produto: " + error.message);
+        }else{
+            carregarDados();
+            setNovoProduto({ nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
+        }
+      }
+
+      if(carregando && produtos.length === 0){
+          return <div className="flex items-center justify-center min-h-screen text-white">Carregando sistema...</div>
       }
 
       return (
@@ -312,3 +347,45 @@
                     <div className="flex items-end">
                       <button type="submit" className="w-full bg-[#4A6332] hover:bg-[#3b4f28] text-white font-semibold py-2.5 rounded-lg shadow-md transition-colors">Salvar Produto</button>
                     </div>
+                  </div>
+                </form>
+                
+                 <div className="bg-[#171717] border border-[#262626] rounded-xl p-6 overflow-x-auto shadow-sm mt-6">
+                  <h3 className="text-base font-semibold mb-4 text-white">Produtos Cadastrados</h3>
+                  <table className="w-full text-left text-sm text-zinc-400">
+                    <thead className="border-b border-[#262626]">
+                      <tr>
+                        <th className="pb-3 font-medium uppercase text-xs">Produto</th>
+                        <th className="pb-3 font-medium uppercase text-xs">Preço Venda</th>
+                        <th className="pb-3 font-medium uppercase text-xs">Custo</th>
+                        <th className="pb-3 font-medium uppercase text-xs">Margem Bruta</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#262626]">
+                      {produtos.map(p => {
+                        const margem = Number(p.preco_venda) - Number(p.custo_unitario);
+                        return (
+                          <tr key={p.id} className="hover:bg-[#1e1e1e] transition-colors">
+                            <td className="py-3 text-white font-medium">{p.nome}</td>
+                            <td className="py-3 text-white">R$ {Number(p.preco_venda).toFixed(2)}</td>
+                            <td className="py-3">R$ {Number(p.custo_unitario).toFixed(2)}</td>
+                            <td className="py-3 font-medium text-[#4A6332]">R$ {margem.toFixed(2)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+          </main>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
