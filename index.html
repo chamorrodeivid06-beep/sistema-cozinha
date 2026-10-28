@@ -3,14 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
- <title>FoodStrick | Gestão Master</title>
+  <title>FoodStrick | Gestão Master</title>
   
-  <!-- FAVICON OFICIAL FOODSTRICK (CHAMA LARANJA) -->
+  <!-- FAVICON OFICIAL -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%228%22%20fill%3D%22%23D95B1E%22/%3E%3Cg%20transform%3D%22translate%284%2C%204%29%22%3E%3Cpath%20d%3D%22M8.5%2014.5A2.5%202.5%200%200%200%2011%2012c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054%202-6%20.5%202.5%202%204.9%204%206.5%202%201.6%203%203.5%203%205.5a7%207%200%201%201-14%200c0-1.153.433-2.294%201-3a2.5%202.5%200%200%200%202.5%202.5z%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/g%3E%3C/svg%3E">
   
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <!-- VERSÕES DE PRODUÇÃO (MUITO MAIS RÁPIDAS E LEVES) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -39,7 +40,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
+    const { useState, useEffect, useRef, useMemo } = React;
     
     const SUPABASE_URL = 'https://ddngvelrtqmfgaeqsjem.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_EhLCuypZr6vHrSKDCrHxQg_n7BvKxBU';
@@ -48,35 +49,49 @@
     const LOGIN_BG_IMAGE = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=1920&auto=format&fit=crop";
 
     function App() {
-      const [isAuthenticated, setIsAuthenticated] = useState(false);
-      const [currentUser, setCurrentUser] = useState(null);
+      // CACHE INSTANTÂNEO: O app lê o usuário e os dados da memória imediatamente
+      const [isAuthenticated, setIsAuthenticated] = useState(() => {
+        return Boolean(localStorage.getItem('foodstrick_master_session'));
+      });
 
-      // Controle do Menu Mobile (Gaveta)
+      const [currentUser, setCurrentUser] = useState(() => {
+        try {
+          const saved = localStorage.getItem('foodstrick_master_session');
+          return saved ? JSON.parse(saved) : null;
+        } catch(e) { return null; }
+      });
+
       const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-      // Modo Suporte
       const [impersonatedCompany, setImpersonatedCompany] = useState(null);
       const [adminInsideNotification, setAdminInsideNotification] = useState(null);
       const [, setForceUpdate] = useState(0);
 
-      // Login
       const [username, setUsername] = useState('');
       const [password, setPassword] = useState('');
       const [showPassword, setShowPassword] = useState(false);
       const [authError, setAuthError] = useState('');
 
-      // Navegação
       const [abaAtiva, setAbaAtiva] = useState('painel'); 
       const [subAbaConfig, setSubAbaConfig] = useState('conta'); 
 
-      // Dados Operacionais
-      const [produtos, setProdutos] = useState([]);
-      const [lancamentos, setLancamentos] = useState([]);
+      // Dados pré-carregados de cache local (0ms de atraso visual)
+      const [produtos, setProdutos] = useState(() => {
+        try {
+          const cached = localStorage.getItem('cache_prods');
+          return cached ? JSON.parse(cached) : [];
+        } catch(e) { return []; }
+      });
+
+      const [lancamentos, setLancamentos] = useState(() => {
+        try {
+          const cached = localStorage.getItem('cache_lancs');
+          return cached ? JSON.parse(cached) : [];
+        } catch(e) { return []; }
+      });
+
       const [historicoFechamentos, setHistoricoFechamentos] = useState([]);
-      const [carregando, setCarregando] = useState(false);
       const [processandoFechamento, setProcessandoFechamento] = useState(false);
 
-      // Modais
       const [modalExclusao, setModalExclusao] = useState({ aberto: false, idLancamento: null });
       const [motivoExclusao, setMotivoExclusao] = useState('Pedido cancelado');
       const [modalExcluirProduto, setModalExcluirProduto] = useState({ aberto: false, idProduto: null, nome: '' });
@@ -92,7 +107,6 @@
         nome: '', quantidade: '', custo: ''
       });
 
-      // Formulários
       const [novoLancamento, setNovoLancamento] = useState({
         data: new Date().toISOString().split('T')[0],
         tipo: 'Venda', produto_id: '', descricao: '', quantidade: 1, 
@@ -103,7 +117,6 @@
         nome: '', preco_venda: '', custo_unitario: '', observacao: ''
       });
 
-      // Gestão Master (B2B)
       const [companiesList, setCompaniesList] = useState([]);
       const [newCompanyName, setNewCompanyName] = useState('');
       const [newCompanySlug, setNewCompanySlug] = useState('');
@@ -121,32 +134,13 @@
         const trigger = () => setForceUpdate(n => n + 1);
         window.addEventListener('live-cursor-loaded', trigger);
         window.addEventListener('support-chat-loaded', trigger);
-        const t1 = setTimeout(trigger, 300);
-        const t2 = setTimeout(trigger, 1000);
         return () => {
           window.removeEventListener('live-cursor-loaded', trigger);
           window.removeEventListener('support-chat-loaded', trigger);
-          clearTimeout(t1);
-          clearTimeout(t2);
         };
       }, []);
 
-      useEffect(() => {
-        const saved = localStorage.getItem('foodstrick_master_session');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            setCurrentUser(parsed);
-            setIsAuthenticated(true);
-            if (parsed.role === 'superadmin') {
-              setAbaAtiva('configuracoes');
-              setSubAbaConfig('empresas');
-              fetchCompanies();
-            }
-          } catch (e) {}
-        }
-      }, []);
-
+      // Heartbeat equilibrado para não sobrecarregar a rede do celular
       useEffect(() => {
         if (!isAuthenticated || !currentUser || isSuperAdmin) return;
 
@@ -167,62 +161,51 @@
         };
 
         verificarSuporteAtivo();
-        const interval = setInterval(verificarSuporteAtivo, 4000);
+        const interval = setInterval(verificarSuporteAtivo, 12000);
         return () => clearInterval(interval);
       }, [isAuthenticated, currentUser, isSuperAdmin]);
 
+      // CARREGAMENTO PARALELO (PROMISE.ALL)
       useEffect(() => {
         if (isAuthenticated && effectiveCompanyId && effectiveCompanyId !== 'foodstrick-master') {
-          carregarDadosOperacionais(effectiveCompanyId);
-          carregarHistoricoFechamentos(effectiveCompanyId);
+          carregarTudoEmParalelo(effectiveCompanyId);
         }
       }, [isAuthenticated, effectiveCompanyId]);
 
-      async function carregarDadosOperacionais(compId) {
-        setCarregando(true);
+      async function carregarTudoEmParalelo(compId) {
         try {
-          let prodsData = [];
-          let lancsData = [];
+          const [resProd, resLanc, resFech] = await Promise.all([
+            supabaseClient
+              .from('produtos')
+              .select('*')
+              .or(`company_id.eq.${compId},company_id.eq.cozinha-brasileira,company_id.is.null`)
+              .order('nome'),
+            supabaseClient
+              .from('lancamentos')
+              .select('*')
+              .or(`company_id.eq.${compId},company_id.eq.cozinha-brasileira,company_id.is.null`)
+              .order('data', { ascending: false }),
+            supabaseClient
+              .from('fechamentos')
+              .select('*')
+              .eq('company_id', compId)
+              .order('data_fechamento', { ascending: false })
+          ]);
 
-          const resProd = await supabaseClient
-            .from('produtos')
-            .select('*')
-            .or(`company_id.eq.${compId},company_id.eq.cozinha-brasileira,company_id.is.null`)
-            .order('nome');
-
-          const resLanc = await supabaseClient
-            .from('lancamentos')
-            .select('*')
-            .or(`company_id.eq.${compId},company_id.eq.cozinha-brasileira,company_id.is.null`)
-            .order('data', { ascending: false });
-
-          if (!resProd.error && resProd.data) prodsData = resProd.data;
-          else {
-            const fallbackProd = await supabaseClient.from('produtos').select('*').order('nome');
-            if (fallbackProd.data) prodsData = fallbackProd.data;
+          if (resProd.data) {
+            setProdutos(resProd.data);
+            localStorage.setItem('cache_prods', JSON.stringify(resProd.data));
           }
-
-          if (!resLanc.error && resLanc.data) lancsData = resLanc.data;
-          else {
-            const fallbackLanc = await supabaseClient.from('lancamentos').select('*').order('data', { ascending: false });
-            if (fallbackLanc.data) lancsData = fallbackLanc.data;
+          if (resLanc.data) {
+            setLancamentos(resLanc.data);
+            localStorage.setItem('cache_lancs', JSON.stringify(resLanc.data));
           }
-
-          setProdutos(prodsData);
-          setLancamentos(lancsData);
-        } catch (err) {}
-        setCarregando(false);
-      }
-
-      async function carregarHistoricoFechamentos(compId) {
-        try {
-          const { data } = await supabaseClient
-            .from('fechamentos')
-            .select('*')
-            .eq('company_id', compId)
-            .order('data_fechamento', { ascending: false });
-          if (data) setHistoricoFechamentos(data);
-        } catch (err) {}
+          if (resFech.data) {
+            setHistoricoFechamentos(resFech.data);
+          }
+        } catch (err) {
+          console.error("Erro na sincronização:", err);
+        }
       }
 
       const handleLogin = async (e) => {
@@ -294,6 +277,8 @@
           await handleStopImpersonation();
         }
         localStorage.removeItem('foodstrick_master_session');
+        localStorage.removeItem('cache_prods');
+        localStorage.removeItem('cache_lancs');
         setIsAuthenticated(false);
         setCurrentUser(null);
         setImpersonatedCompany(null);
@@ -330,36 +315,63 @@
         setSubAbaConfig('empresas');
       };
 
-      // Cálculos Financeiros
-      const lancamentosAtivos = lancamentos.filter(l => l.status === 'ativo' || l.status === null);
-      const lancamentosExcluidos = lancamentos.filter(l => l.status === 'excluido');
+      // Cálculos memoizados para evitar recomputações na renderização
+      const lancamentosAtivos = useMemo(() => {
+        return lancamentos.filter(l => l.status === 'ativo' || l.status === null);
+      }, [lancamentos]);
 
-      const faturamento = lancamentosAtivos.filter(l => l.tipo === 'Venda').reduce((acc, curr) => acc + Number(curr.valor_total), 0);
-      const lucroProdutos = lancamentosAtivos.filter(l => l.tipo === 'Venda').reduce((acc, curr) => acc + (Number(curr.valor_total) - Number(curr.custo_total)), 0);
-      const totalDespesas = lancamentosAtivos.filter(l => l.tipo === 'Despesa').reduce((acc, curr) => acc + Number(curr.valor_total), 0);
-      const resultadoMes = lucroProdutos - totalDespesas;
+      const lancamentosExcluidos = useMemo(() => {
+        return lancamentos.filter(l => l.status === 'excluido');
+      }, [lancamentos]);
 
-      const totalBebidas = lancamentosAtivos.filter(l => l.tipo === 'Venda' && l.canal_categoria === 'Bebidas').reduce((acc, curr) => acc + Number(curr.quantidade || 0), 0);
-      const totalPratos = lancamentosAtivos.filter(l => l.tipo === 'Venda' && l.canal_categoria !== 'Bebidas').reduce((acc, curr) => acc + Number(curr.quantidade || 0), 0);
-
-      let ingredientesUsados = {};
-      lancamentosAtivos.filter(l => l.tipo === 'Venda').forEach(venda => {
-        const prod = produtos.find(p => p.id === venda.produto_id);
-        if (prod && Array.isArray(prod.ingredientes)) {
-          prod.ingredientes.forEach(ing => {
-            const num = parseFloat(ing.quantidade) || 1;
-            const totalQtd = num * Number(venda.quantidade || 1);
-            const unidade = String(ing.quantidade).replace(/[0-9.,]/g, '').trim() || 'un';
-            
-            if (!ingredientesUsados[ing.nome]) {
-              ingredientesUsados[ing.nome] = { qtd: 0, unidade: unidade, custoTotal: 0 };
-            }
-            ingredientesUsados[ing.nome].qtd += totalQtd;
-            ingredientesUsados[ing.nome].custoTotal += (Number(ing.custo || 0) * Number(venda.quantidade || 1));
-          });
+      const { faturamento, lucroProdutos, totalDespesas, resultadoMes, totalBebidas, totalPratos } = useMemo(() => {
+        let fat = 0, lucroP = 0, desp = 0, beb = 0, pratos = 0;
+        
+        for (let i = 0; i < lancamentosAtivos.length; i++) {
+          const l = lancamentosAtivos[i];
+          const val = Number(l.valor_total) || 0;
+          if (l.tipo === 'Venda') {
+            fat += val;
+            lucroP += (val - (Number(l.custo_total) || 0));
+            if (l.canal_categoria === 'Bebidas') beb += Number(l.quantidade || 0);
+            else pratos += Number(l.quantidade || 0);
+          } else if (l.tipo === 'Despesa') {
+            desp += val;
+          }
         }
-      });
-      const arrayIngredientes = Object.entries(ingredientesUsados).sort((a, b) => b[1].qtd - a[1].qtd);
+        return {
+          faturamento: fat,
+          lucroProdutos: lucroP,
+          totalDespesas: desp,
+          resultadoMes: lucroP - desp,
+          totalBebidas: beb,
+          totalPratos: pratos
+        };
+      }, [lancamentosAtivos]);
+
+      const arrayIngredientes = useMemo(() => {
+        const mapa = {};
+        const prodsMap = new Map(produtos.map(p => [p.id, p]));
+
+        lancamentosAtivos.forEach(venda => {
+          if (venda.tipo !== 'Venda') return;
+          const prod = prodsMap.get(venda.produto_id);
+          if (prod && Array.isArray(prod.ingredientes)) {
+            prod.ingredientes.forEach(ing => {
+              const num = parseFloat(ing.quantidade) || 1;
+              const totalQtd = num * Number(venda.quantidade || 1);
+              const unidade = String(ing.quantidade).replace(/[0-9.,]/g, '').trim() || 'un';
+              
+              if (!mapa[ing.nome]) {
+                mapa[ing.nome] = { qtd: 0, unidade: unidade, custoTotal: 0 };
+              }
+              mapa[ing.nome].qtd += totalQtd;
+              mapa[ing.nome].custoTotal += (Number(ing.custo || 0) * Number(venda.quantidade || 1));
+            });
+          }
+        });
+        return Object.entries(mapa).sort((a, b) => b[1].qtd - a[1].qtd);
+      }, [lancamentosAtivos, produtos]);
 
       async function handleSalvarLancamento(e) {
         e.preventDefault();
@@ -395,7 +407,7 @@
         const { error } = await supabaseClient.from('lancamentos').insert([payload]);
         if (error) alert("Erro: " + error.message);
         else {
-          carregarDadosOperacionais(compTarget);
+          carregarTudoEmParalelo(compTarget);
           setNovoLancamento({ ...novoLancamento, descricao: '', valor_despesa: '', quantidade: 1, produto_id: '', fornecedor: '' });
         }
       }
@@ -405,7 +417,7 @@
         const compTarget = effectiveCompanyId || 'cozinha-brasileira';
         const { error } = await supabaseClient.from('lancamentos').update({ status: 'excluido', motivo_exclusao: motivoExclusao }).eq('id', modalExclusao.idLancamento);
         if (error) alert("Erro: " + error.message);
-        else { carregarDadosOperacionais(compTarget); setModalExclusao({ aberto: false, idLancamento: null }); }
+        else { carregarTudoEmParalelo(compTarget); setModalExclusao({ aberto: false, idLancamento: null }); }
       }
 
       async function handleSalvarProduto(e) {
@@ -421,7 +433,7 @@
         };
         const { error } = await supabaseClient.from('produtos').insert([payload]);
         if (error) alert("Erro: " + error.message);
-        else { carregarDadosOperacionais(compTarget); setNovoProduto({ nome: '', preco_venda: '', custo_unitario: '', observacao: '' }); }
+        else { carregarTudoEmParalelo(compTarget); setNovoProduto({ nome: '', preco_venda: '', custo_unitario: '', observacao: '' }); }
       }
 
       async function handleAtualizarProduto(e) {
@@ -437,7 +449,7 @@
         const { error } = await supabaseClient.from('produtos').update(payload).eq('id', modalEditarProduto.id);
         if (error) alert("Erro ao atualizar produto: " + error.message);
         else {
-          carregarDadosOperacionais(compTarget);
+          carregarTudoEmParalelo(compTarget);
           setModalEditarProduto({ aberto: false, id: null, nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
         }
       }
@@ -452,7 +464,7 @@
         }
         const { error } = await supabaseClient.from('produtos').delete().eq('id', id);
         if (error) alert("Erro: " + error.message);
-        else { carregarDadosOperacionais(compTarget); setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' }); }
+        else { carregarTudoEmParalelo(compTarget); setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' }); }
       }
 
       async function handleAdicionarInsumo(e) {
@@ -479,7 +491,7 @@
           const prodAtualizado = { ...prod, ingredientes: novaLista, custo_unitario: novoCustoTotal };
           setModalFichaTecnica({ aberto: true, produto: prodAtualizado });
           setNovoInsumo({ nome: '', quantidade: '', custo: '' });
-          carregarDadosOperacionais(effectiveCompanyId);
+          carregarTudoEmParalelo(effectiveCompanyId);
         }
       }
 
@@ -497,7 +509,7 @@
         } else {
           const prodAtualizado = { ...prod, ingredientes: novaLista, custo_unitario: novaLista.length > 0 ? novoCustoTotal : prod.custo_unitario };
           setModalFichaTecnica({ aberto: true, produto: prodAtualizado });
-          carregarDadosOperacionais(effectiveCompanyId);
+          carregarTudoEmParalelo(effectiveCompanyId);
         }
       }
 
@@ -520,8 +532,7 @@
         await supabaseClient.from('lancamentos').update({ status: 'arquivado' }).in('id', ids);
 
         alert("Fechamento concluído com sucesso!");
-        carregarDadosOperacionais(compTarget);
-        carregarHistoricoFechamentos(compTarget);
+        carregarTudoEmParalelo(compTarget);
         setProcessandoFechamento(false);
       }
 
@@ -585,15 +596,12 @@
 
       const isSupportSessionActive = Boolean(impersonatedCompany || adminInsideNotification);
 
-      // Função auxiliar para mudar aba fechando menu mobile
       const navegarPara = (aba) => {
         setAbaAtiva(aba);
         setMobileMenuOpen(false);
       };
 
-      // ==========================
-      // TELA DE LOGIN RESPONSIVA
-      // ==========================
+      // TELA DE LOGIN
       if (!isAuthenticated) {
         return (
           <div className="min-h-screen w-full flex items-center justify-center md:justify-start p-4 sm:p-6 md:p-16 lg:p-24 relative bg-cover bg-center" style={{ backgroundImage: `url("${LOGIN_BG_IMAGE}")` }}>
@@ -632,13 +640,11 @@
         );
       }
 
-      // ==========================
-      // SISTEMA PRINCIPAL RESPONSIVO
-      // ==========================
+      // SISTEMA PRINCIPAL
       return (
         <div className="flex flex-col md:flex-row min-h-screen relative">
           
-          {/* HEADER EXCLUSIVO PARA DISPOSITIVOS MÓVEIS (CELULARES) */}
+          {/* HEADER MOBILE */}
           <header className="md:hidden sticky top-0 z-40 bg-[#141414] border-b border-[#242424] px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-[#D95B1E] flex items-center justify-center text-white shadow-sm">
@@ -650,7 +656,6 @@
               </div>
             </div>
 
-            {/* Botão Hambúrguer Mobile */}
             <button 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
               className="p-2 text-zinc-300 hover:text-white bg-[#202020] border border-[#333] rounded-lg transition-colors"
@@ -664,7 +669,7 @@
             </button>
           </header>
 
-          {/* GAVETA / MENU MOBILE DESLIZANTE */}
+          {/* GAVETA MOBILE */}
           {mobileMenuOpen && (
             <div className="md:hidden fixed inset-0 z-30 bg-black/80 backdrop-blur-sm pt-16 flex flex-col justify-between p-5 animate-in fade-in duration-150">
               <nav className="space-y-2 mt-2">
@@ -705,7 +710,7 @@
             </div>
           )}
 
-          {/* AVISO QUANDO ADMIN CONECTADO (AUDITORIA) */}
+          {/* NOTIFICAÇÃO AUDITORIA */}
           {adminInsideNotification && (
             <div className="fixed top-14 md:top-4 left-3 right-3 md:left-72 z-40 p-3 bg-blue-950/95 border border-blue-500/60 rounded-xl flex items-center justify-between text-xs text-blue-200 shadow-2xl backdrop-blur-md">
               <div className="flex items-center gap-2">
@@ -716,7 +721,7 @@
             </div>
           )}
 
-          {/* MODAL EXCLUSÃO LANÇAMENTO */}
+          {/* MODAL EXCLUSÃO */}
           {modalExclusao.aberto && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
               <div className="bg-[#171717] border border-[#333] rounded-xl p-5 sm:p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -886,7 +891,7 @@
             </div>
           )}
 
-          {/* SIDEBAR FIXA PARA COMPUTADORES (DESKTOP) */}
+          {/* SIDEBAR DESKTOP */}
           <aside className="hidden md:flex w-64 bg-[#141414] border-r border-[#242424] p-5 flex-col justify-between shrink-0 h-screen sticky top-0 overflow-y-auto z-20">
             <div>
               <div className="flex items-center gap-3 pb-6 border-b border-[#242424]">
@@ -939,7 +944,7 @@
             </div>
           </aside>
 
-          {/* SUB-SIDEBAR (DESKTOP) */}
+          {/* SUB-SIDEBAR DESKTOP */}
           {abaAtiva === 'configuracoes' && (
             <aside className="w-56 bg-[#111111] border-r border-[#242424] p-5 shrink-0 hidden md:block h-screen sticky top-0 overflow-y-auto z-10">
               <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4">Ajustes & Gestão</h3>
@@ -962,7 +967,7 @@
             </aside>
           )}
 
-          {/* CONTEÚDO PRINCIPAL COM PADDING ADAPTADO PARA MOBILE */}
+          {/* CONTEÚDO PRINCIPAL */}
           <main className="flex-1 bg-[#0f0f0f] p-4 sm:p-6 md:p-10 overflow-y-auto">
 
             {impersonatedCompany && (
@@ -1344,7 +1349,7 @@
             {abaAtiva === 'configuracoes' && (
               <div className="max-w-6xl">
                 
-                {/* ABAS DE NAVEGAÇÃO SUPERIOR NO MOBILE */}
+                {/* NAVEGAÇÃO SUPERIOR MOBILE */}
                 <div className="md:hidden flex items-center gap-1.5 overflow-x-auto pb-3 mb-4 border-b border-[#242424]">
                   {(!isSuperAdmin || impersonatedCompany) && (
                     <button onClick={() => setSubAbaConfig('exclusoes')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap ${subAbaConfig === 'exclusoes' ? 'bg-[#D95B1E] text-white' : 'bg-[#1c1c1c] text-zinc-400'}`}>
@@ -1423,7 +1428,6 @@
                   </div>
                 )}
 
-                {/* SUB-ABA: CONTA & SESSÃO COM FOTO DE PERFIL RESPONSIVA */}
                 {subAbaConfig === 'conta' && (
                   <div className="bg-[#161616] border border-[#262626] p-5 sm:p-8 rounded-2xl w-full">
                     <div className="flex flex-col lg:flex-row gap-6 sm:gap-10">
@@ -1476,7 +1480,7 @@
             )}
           </main>
 
-          {/* CURSOR MULTIPLAYER (DESKTOP) */}
+          {/* CURSOR MULTIPLAYER */}
           {window.LiveCursorComponent && isSupportSessionActive && (
             <window.LiveCursorComponent 
               companyId={effectiveCompanyId}
