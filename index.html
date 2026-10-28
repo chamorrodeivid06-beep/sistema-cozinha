@@ -5,19 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>FoodStrick | Gestão Master</title>
   
-  <!-- FAVICON OFICIAL -->
+  <!-- FAVICON OFICIAL FOODSTRICK -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%228%22%20fill%3D%22%23D95B1E%22/%3E%3Cg%20transform%3D%22translate%284%2C%204%29%22%3E%3Cpath%20d%3D%22M8.5%2014.5A2.5%202.5%200%200%200%2011%2012c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054%202-6%20.5%202.5%202%204.9%204%206.5%202%201.6%203%203.5%203%205.5a7%207%200%201%201-14%200c0-1.153.433-2.294%201-3a2.5%202.5%200%200%200%202.5%202.5z%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/g%3E%3C/svg%3E">
   
+  <!-- BIBLIOTECAS OTIMIZADAS PARA PRODUÇÃO -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- VERSÕES DE PRODUÇÃO (MUITO MAIS RÁPIDAS E LEVES) -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- MÓDULOS EXTERNOS DE SUPORTE -->
-  <script type="text/babel" src="LiveCursor.js"></script>
-  <script type="text/babel" src="SupportChat.js"></script>
 
   <style>
     body { 
@@ -34,12 +30,29 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
     ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+    @keyframes pulseLogo {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.08); opacity: 0.8; }
+    }
+    .splash-pulse {
+      animation: pulseLogo 1.6s ease-in-out infinite;
+    }
   </style>
 </head>
 <body>
-  <div id="root"></div>
+  <!-- TELA DE CARREGAMENTO IMEDIATA (ACABA COM A TELA PRETA AO DAR F5) -->
+  <div id="root">
+    <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f0f0f; color: #fff;">
+      <div class="splash-pulse" style="width: 56px; height: 56px; border-radius: 16px; background-color: #D95B1E; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 25px rgba(217,91,30,0.35); margin-bottom: 16px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+      </div>
+      <h2 style="font-size: 16px; font-weight: 800; letter-spacing: 0.5px; margin: 0; color: #ffffff;">FoodStrick</h2>
+      <span style="font-size: 11px; color: #71717a; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px;">Iniciando sistema...</span>
+    </div>
+  </div>
 
-  <script type="text/babel">
+  <script type="text/babel" data-presets="react">
     const { useState, useEffect, useRef, useMemo } = React;
     
     const SUPABASE_URL = 'https://ddngvelrtqmfgaeqsjem.supabase.co';
@@ -48,23 +61,259 @@
 
     const LOGIN_BG_IMAGE = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=1920&auto=format&fit=crop";
 
-    function App() {
-      // CACHE INSTANTÂNEO: O app lê o usuário e os dados da memória imediatamente
-      const [isAuthenticated, setIsAuthenticated] = useState(() => {
-        return Boolean(localStorage.getItem('foodstrick_master_session'));
-      });
+    // ==========================================
+    // COMPONENTE: LIVE CURSOR (SUPORTE AO VIVO)
+    // ==========================================
+    function LiveCursor({ companyId, currentUsername, currentUserRole, targetUsername, isActive, supabaseClient }) {
+      const [remoteCursor, setRemoteCursor] = useState(null);
+      const [isRemoteOnline, setIsRemoteOnline] = useState(false);
+      const [clickRipples, setClickRipples] = useState([]);
+      const lastEmitRef = useRef(0);
+      const lastScrollEmitRef = useRef(0);
+      const timeoutRef = useRef(null);
+      const isReceivingScrollRef = useRef(false);
 
+      useEffect(() => {
+        if (!isActive || !companyId || !targetUsername || !supabaseClient) {
+          setRemoteCursor(null);
+          return;
+        }
+
+        const channel = supabaseClient.channel(`cursor-${companyId}-${targetUsername}`, {
+          config: { broadcast: { self: false } }
+        });
+
+        channel
+          .on('broadcast', { event: 'cursor-pos' }, ({ payload }) => {
+            if (payload && payload.sender !== currentUsername) {
+              setRemoteCursor({ xRatio: payload.xRatio, yRatio: payload.yRatio, sender: payload.sender, role: payload.role });
+              setIsRemoteOnline(true);
+              if (timeoutRef.current) clearTimeout(timeoutRef.current);
+              timeoutRef.current = setTimeout(() => setIsRemoteOnline(false), 4000);
+            }
+          })
+          .on('broadcast', { event: 'cursor-click' }, ({ payload }) => {
+            if (payload && payload.sender !== currentUsername) {
+              const posX = payload.xRatio * window.innerWidth;
+              const posY = payload.yRatio * window.innerHeight;
+              const rippleId = Date.now();
+              setClickRipples(prev => [...prev, { id: rippleId, x: posX, y: posY }]);
+              setTimeout(() => setClickRipples(prev => prev.filter(r => r.id !== rippleId)), 800);
+
+              const el = document.elementFromPoint(posX, posY);
+              if (el) {
+                el.click();
+                if (['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName)) el.focus();
+              }
+            }
+          })
+          .on('broadcast', { event: 'page-scroll' }, ({ payload }) => {
+            if (payload && payload.sender !== currentUsername) {
+              isReceivingScrollRef.current = true;
+              const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+              window.scrollTo({ top: payload.scrollRatio * (maxScroll > 0 ? maxScroll : 1), behavior: 'smooth' });
+              setTimeout(() => { isReceivingScrollRef.current = false; }, 150);
+            }
+          })
+          .subscribe();
+
+        const handleMouseMove = (e) => {
+          const now = Date.now();
+          if (now - lastEmitRef.current > 25) {
+            lastEmitRef.current = now;
+            channel.send({
+              type: 'broadcast',
+              event: 'cursor-pos',
+              payload: { xRatio: e.clientX / window.innerWidth, yRatio: e.clientY / window.innerHeight, sender: currentUsername, role: currentUserRole || 'operador' }
+            });
+          }
+        };
+
+        const handleClick = (e) => {
+          channel.send({
+            type: 'broadcast',
+            event: 'cursor-click',
+            payload: { xRatio: e.clientX / window.innerWidth, yRatio: e.clientY / window.innerHeight, sender: currentUsername }
+          });
+        };
+
+        const handleScroll = () => {
+          if (isReceivingScrollRef.current) return;
+          const now = Date.now();
+          if (now - lastScrollEmitRef.current > 40) {
+            lastScrollEmitRef.current = now;
+            const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+            channel.send({
+              type: 'broadcast',
+              event: 'page-scroll',
+              payload: { scrollRatio: maxScroll > 0 ? window.scrollY / maxScroll : 0, sender: currentUsername }
+            });
+          }
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('click', handleClick);
+        window.addEventListener('scroll', handleScroll, { passive: true });
+
+        return () => {
+          window.removeEventListener('mousemove', handleMouseMove);
+          window.removeEventListener('click', handleClick);
+          window.removeEventListener('scroll', handleScroll);
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          supabaseClient.removeChannel(channel);
+        };
+      }, [isActive, companyId, targetUsername, currentUsername, currentUserRole, supabaseClient]);
+
+      if (!isActive || !remoteCursor || !isRemoteOnline) return null;
+
+      const posX = remoteCursor.xRatio * (typeof window !== 'undefined' ? window.innerWidth : 1000);
+      const posY = remoteCursor.yRatio * (typeof window !== 'undefined' ? window.innerHeight : 800);
+      const isSuper = remoteCursor.role === 'superadmin' || remoteCursor.sender === 'admin';
+
+      return (
+        <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
+          {clickRipples.map(ripple => (
+            <span key={ripple.id} style={{ left: ripple.x - 18, top: ripple.y - 18 }} className="absolute w-9 h-9 rounded-full border-2 border-[#D95B1E] animate-ping opacity-90 pointer-events-none" />
+          ))}
+          <div style={{ transform: `translate3d(${posX}px, ${posY}px, 0)`, transition: 'transform 0.04s linear' }} className="absolute top-0 left-0 flex flex-col items-start select-none">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className="drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] -translate-x-1 -translate-y-1">
+              <path d="M5.65 2.15C5.1 1.6 4.25 2.05 4.3 2.85L5.75 19.35C5.8 20.05 6.7 20.35 7.2 19.85L11.5 15.5L16.2 21.8C16.5 22.2 17.1 22.3 17.5 22L20.2 20C20.6 19.7 20.7 19.1 20.4 18.7L15.7 12.4L21.4 11.2C22.1 11.05 22.3 10.15 21.75 9.75L5.65 2.15Z" fill={isSuper ? '#D95B1E' : '#10B981'} stroke="#000000" strokeWidth="1.5" />
+            </svg>
+            <div className={`ml-3 -mt-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white shadow-xl flex items-center gap-1.5 border border-black/30 ${isSuper ? 'bg-[#D95B1E]' : 'bg-emerald-600'}`}>
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+              <span>{isSuper ? `Suporte (${remoteCursor.sender})` : remoteCursor.sender}</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // COMPONENTE: SUPPORT CHAT (CHAT EM TEMPO REAL)
+    // ==========================================
+    function SupportChat({ companyId, currentUsername, currentUserRole, operatorUsername, isVisible, supabaseClient }) {
+      const [isOpen, setIsOpen] = useState(false);
+      const [messages, setMessages] = useState([]);
+      const [newMessage, setNewMessage] = useState('');
+      const [unreadCount, setUnreadCount] = useState(0);
+      const messagesEndRef = useRef(null);
+
+      const fetchMessages = async () => {
+        if (!companyId || !operatorUsername || !supabaseClient) return;
+        try {
+          const { data } = await supabaseClient.from('support_messages').select('*').eq('company_id', companyId).eq('operator_username', operatorUsername).order('created_at', { ascending: true });
+          if (data) setMessages(data);
+        } catch (err) {}
+      };
+
+      useEffect(() => {
+        if (!isVisible || !companyId || !operatorUsername || !supabaseClient) return;
+        fetchMessages();
+
+        const channel = supabaseClient.channel(`chat-${companyId}-${operatorUsername}`)
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `operator_username=eq.${operatorUsername}` }, (payload) => {
+            if (payload.new && payload.new.company_id === companyId) {
+              setMessages(prev => [...prev, payload.new]);
+              if (!isOpen && payload.new.sender_username !== currentUsername) setUnreadCount(c => c + 1);
+            }
+          }).subscribe();
+
+        return () => { supabaseClient.removeChannel(channel); };
+      }, [companyId, operatorUsername, isOpen, currentUsername, isVisible, supabaseClient]);
+
+      useEffect(() => {
+        if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, [messages, isOpen]);
+
+      if (!isVisible || !companyId || !operatorUsername) return null;
+
+      const handleSendMessage = async (e) => {
+        e.preventDefault();
+        const text = newMessage.trim();
+        if (!text) return;
+        setNewMessage('');
+        try {
+          await supabaseClient.from('support_messages').insert([{ company_id: companyId, operator_username: operatorUsername, sender_username: currentUsername, sender_role: currentUserRole || 'operador', message: text }]);
+        } catch (err) {}
+      };
+
+      return (
+        <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end">
+          {isOpen && (
+            <div className="w-80 sm:w-96 h-[480px] bg-[#161616] border border-[#2d2d2d] rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-3">
+              <div className="p-4 bg-[#111111] border-b border-[#262626] flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-[#D95B1E]/10 border border-[#D95B1E]/30 flex items-center justify-center text-[#D95B1E]">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                      Canal Direto de Suporte
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    </h4>
+                    <p className="text-[10px] text-zinc-400">Atendimento: <strong className="text-[#D95B1E]">{operatorUsername}</strong></p>
+                  </div>
+                </div>
+                <button onClick={() => setIsOpen(false)} className="text-zinc-400 hover:text-white p-1 rounded-lg">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+              </div>
+
+              <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs">
+                {messages.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center text-zinc-500 space-y-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-700"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <p className="text-[11px]">Nenhuma mensagem ainda.<br />Inicie a conversa pelo suporte.</p>
+                  </div>
+                ) : (
+                  messages.map(m => {
+                    const isMe = m.sender_username?.toLowerCase() === currentUsername?.toLowerCase();
+                    return (
+                      <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                        <span className="text-[10px] text-zinc-500 mb-0.5 px-1">{isMe ? 'Você' : m.sender_username} ({m.sender_role})</span>
+                        <div className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${isMe ? 'bg-[#D95B1E] text-white font-medium rounded-tr-none' : 'bg-[#222222] text-white rounded-tl-none border border-[#333]'}`}>
+                          {m.message}
+                        </div>
+                        <span className="text-[9px] text-zinc-600 mt-0.5 px-1 font-mono">{new Date(m.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              <form onSubmit={handleSendMessage} className="p-3 bg-[#111111] border-t border-[#262626] flex items-center gap-2">
+                <input type="text" placeholder="Digite sua mensagem..." value={newMessage} onChange={e => setNewMessage(e.target.value)} className="flex-1 bg-[#1c1c1c] border border-[#333] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-[#D95B1E] transition-colors placeholder:text-zinc-500" />
+                <button type="submit" className="bg-[#D95B1E] hover:bg-[#c34e17] text-white p-2 rounded-xl transition-all shadow-md disabled:opacity-40" disabled={!newMessage.trim()}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                </button>
+              </form>
+            </div>
+          )}
+
+          <button onClick={() => { if (!isOpen) setUnreadCount(0); setIsOpen(!isOpen); }} className="w-14 h-14 rounded-full bg-[#D95B1E] hover:bg-[#c34e17] text-white shadow-2xl flex items-center justify-center transition-transform hover:scale-105 active:scale-95 relative border-2 border-orange-400/30 cursor-pointer" title="Abrir Chat de Suporte">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            {unreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-black">{unreadCount}</span>}
+          </button>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // APLICAÇÃO PRINCIPAL (APP)
+    // ==========================================
+    function App() {
+      const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(localStorage.getItem('foodstrick_master_session')));
       const [currentUser, setCurrentUser] = useState(() => {
         try {
-          const saved = localStorage.getItem('foodstrick_master_session');
-          return saved ? JSON.parse(saved) : null;
+          const s = localStorage.getItem('foodstrick_master_session');
+          return s ? JSON.parse(s) : null;
         } catch(e) { return null; }
       });
 
       const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
       const [impersonatedCompany, setImpersonatedCompany] = useState(null);
       const [adminInsideNotification, setAdminInsideNotification] = useState(null);
-      const [, setForceUpdate] = useState(0);
 
       const [username, setUsername] = useState('');
       const [password, setPassword] = useState('');
@@ -74,18 +323,18 @@
       const [abaAtiva, setAbaAtiva] = useState('painel'); 
       const [subAbaConfig, setSubAbaConfig] = useState('conta'); 
 
-      // Dados pré-carregados de cache local (0ms de atraso visual)
+      // Cache em memória para os dados abrirem na hora
       const [produtos, setProdutos] = useState(() => {
         try {
-          const cached = localStorage.getItem('cache_prods');
-          return cached ? JSON.parse(cached) : [];
+          const c = localStorage.getItem('cache_prods');
+          return c ? JSON.parse(c) : [];
         } catch(e) { return []; }
       });
 
       const [lancamentos, setLancamentos] = useState(() => {
         try {
-          const cached = localStorage.getItem('cache_lancs');
-          return cached ? JSON.parse(cached) : [];
+          const c = localStorage.getItem('cache_lancs');
+          return c ? JSON.parse(c) : [];
         } catch(e) { return []; }
       });
 
@@ -96,16 +345,9 @@
       const [motivoExclusao, setMotivoExclusao] = useState('Pedido cancelado');
       const [modalExcluirProduto, setModalExcluirProduto] = useState({ aberto: false, idProduto: null, nome: '' });
       
-      const [modalEditarProduto, setModalEditarProduto] = useState({
-        aberto: false, id: null, nome: '', preco_venda: '', custo_unitario: '', observacao: ''
-      });
-
-      const [modalFichaTecnica, setModalFichaTecnica] = useState({
-        aberto: false, produto: null
-      });
-      const [novoInsumo, setNovoInsumo] = useState({
-        nome: '', quantidade: '', custo: ''
-      });
+      const [modalEditarProduto, setModalEditarProduto] = useState({ aberto: false, id: null, nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
+      const [modalFichaTecnica, setModalFichaTecnica] = useState({ aberto: false, produto: null });
+      const [novoInsumo, setNovoInsumo] = useState({ nome: '', quantidade: '', custo: '' });
 
       const [novoLancamento, setNovoLancamento] = useState({
         data: new Date().toISOString().split('T')[0],
@@ -113,9 +355,7 @@
         pagamento: 'Pix', canal_categoria: 'Delivery', valor_despesa: '', fornecedor: ''
       });
 
-      const [novoProduto, setNovoProduto] = useState({
-        nome: '', preco_venda: '', custo_unitario: '', observacao: ''
-      });
+      const [novoProduto, setNovoProduto] = useState({ nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
 
       const [companiesList, setCompaniesList] = useState([]);
       const [newCompanyName, setNewCompanyName] = useState('');
@@ -130,42 +370,22 @@
       const effectiveCompanyId = impersonatedCompany ? impersonatedCompany.company_id : currentUser?.company_id;
       const effectiveCompanyName = impersonatedCompany ? impersonatedCompany.company_name : (currentUser?.unidade || 'FoodStrick');
 
-      useEffect(() => {
-        const trigger = () => setForceUpdate(n => n + 1);
-        window.addEventListener('live-cursor-loaded', trigger);
-        window.addEventListener('support-chat-loaded', trigger);
-        return () => {
-          window.removeEventListener('live-cursor-loaded', trigger);
-          window.removeEventListener('support-chat-loaded', trigger);
-        };
-      }, []);
-
-      // Heartbeat equilibrado para não sobrecarregar a rede do celular
+      // Heartbeat equilibrado de auditoria
       useEffect(() => {
         if (!isAuthenticated || !currentUser || isSuperAdmin) return;
-
-        const verificarSuporteAtivo = async () => {
+        const checkSupport = async () => {
           try {
-            const { data } = await supabaseClient
-              .from('app_users')
-              .select('active_support_by')
-              .eq('company_id', currentUser.company_id)
-              .maybeSingle();
-
-            if (data && data.active_support_by) {
-              setAdminInsideNotification(data.active_support_by);
-            } else {
-              setAdminInsideNotification(null);
-            }
+            const { data } = await supabaseClient.from('app_users').select('active_support_by').eq('company_id', currentUser.company_id).maybeSingle();
+            if (data && data.active_support_by) setAdminInsideNotification(data.active_support_by);
+            else setAdminInsideNotification(null);
           } catch (err) {}
         };
-
-        verificarSuporteAtivo();
-        const interval = setInterval(verificarSuporteAtivo, 12000);
+        checkSupport();
+        const interval = setInterval(checkSupport, 12000);
         return () => clearInterval(interval);
       }, [isAuthenticated, currentUser, isSuperAdmin]);
 
-      // CARREGAMENTO PARALELO (PROMISE.ALL)
+      // CARREGAMENTO PARALELO RÁPIDO
       useEffect(() => {
         if (isAuthenticated && effectiveCompanyId && effectiveCompanyId !== 'foodstrick-master') {
           carregarTudoEmParalelo(effectiveCompanyId);
@@ -175,21 +395,9 @@
       async function carregarTudoEmParalelo(compId) {
         try {
           const [resProd, resLanc, resFech] = await Promise.all([
-            supabaseClient
-              .from('produtos')
-              .select('*')
-              .or(`company_id.eq.${compId},company_id.eq.cozinha-brasileira,company_id.is.null`)
-              .order('nome'),
-            supabaseClient
-              .from('lancamentos')
-              .select('*')
-              .or(`company_id.eq.${compId},company_id.eq.cozinha-brasileira,company_id.is.null`)
-              .order('data', { ascending: false }),
-            supabaseClient
-              .from('fechamentos')
-              .select('*')
-              .eq('company_id', compId)
-              .order('data_fechamento', { ascending: false })
+            supabaseClient.from('produtos').select('*').or(`company_id.eq.${compId},company_id.eq.cozinha-brasileira,company_id.is.null`).order('nome'),
+            supabaseClient.from('lancamentos').select('*').or(`company_id.eq.${compId},company_id.eq.cozinha-brasileira,company_id.is.null`).order('data', { ascending: false }),
+            supabaseClient.from('fechamentos').select('*').eq('company_id', compId).order('data_fechamento', { ascending: false })
           ]);
 
           if (resProd.data) {
@@ -200,12 +408,8 @@
             setLancamentos(resLanc.data);
             localStorage.setItem('cache_lancs', JSON.stringify(resLanc.data));
           }
-          if (resFech.data) {
-            setHistoricoFechamentos(resFech.data);
-          }
-        } catch (err) {
-          console.error("Erro na sincronização:", err);
-        }
+          if (resFech.data) setHistoricoFechamentos(resFech.data);
+        } catch (err) {}
       }
 
       const handleLogin = async (e) => {
@@ -240,13 +444,7 @@
         }
 
         try {
-          const { data: userData } = await supabaseClient
-            .from('app_users')
-            .select('*')
-            .ilike('username', cleanUser)
-            .eq('password', password)
-            .maybeSingle();
-
+          const { data: userData } = await supabaseClient.from('app_users').select('*').ilike('username', cleanUser).eq('password', password).maybeSingle();
           if (userData) {
             const { data: comp } = await supabaseClient.from('companies').select('*').eq('company_id', userData.company_id).maybeSingle();
             if (comp && comp.status === 'bloqueado') {
@@ -254,13 +452,7 @@
               return;
             }
 
-            const userObj = { 
-              username: userData.username, 
-              role: userData.role || 'operador', 
-              company_id: userData.company_id,
-              unidade: comp ? comp.company_name : 'Minha Cozinha',
-              avatar_url: userData.avatar_url
-            };
+            const userObj = { username: userData.username, role: userData.role || 'operador', company_id: userData.company_id, unidade: comp ? comp.company_name : 'Minha Cozinha', avatar_url: userData.avatar_url };
             localStorage.setItem('foodstrick_master_session', JSON.stringify(userObj));
             setCurrentUser(userObj);
             setIsAuthenticated(true);
@@ -273,9 +465,7 @@
       };
 
       const handleLogout = async () => {
-        if (impersonatedCompany) {
-          await handleStopImpersonation();
-        }
+        if (impersonatedCompany) await handleStopImpersonation();
         localStorage.removeItem('foodstrick_master_session');
         localStorage.removeItem('cache_prods');
         localStorage.removeItem('cache_lancs');
@@ -290,11 +480,7 @@
 
       const handleStartImpersonation = async (comp) => {
         try {
-          await supabaseClient
-            .from('app_users')
-            .update({ active_support_by: currentUser.username })
-            .eq('company_id', comp.company_id);
-
+          await supabaseClient.from('app_users').update({ active_support_by: currentUser.username }).eq('company_id', comp.company_id);
           setImpersonatedCompany(comp);
           setAbaAtiva('painel');
           setMobileMenuOpen(false);
@@ -304,10 +490,7 @@
       const handleStopImpersonation = async () => {
         if (impersonatedCompany) {
           try {
-            await supabaseClient
-              .from('app_users')
-              .update({ active_support_by: null })
-              .eq('company_id', impersonatedCompany.company_id);
+            await supabaseClient.from('app_users').update({ active_support_by: null }).eq('company_id', impersonatedCompany.company_id);
           } catch (err) {}
         }
         setImpersonatedCompany(null);
@@ -315,18 +498,11 @@
         setSubAbaConfig('empresas');
       };
 
-      // Cálculos memoizados para evitar recomputações na renderização
-      const lancamentosAtivos = useMemo(() => {
-        return lancamentos.filter(l => l.status === 'ativo' || l.status === null);
-      }, [lancamentos]);
-
-      const lancamentosExcluidos = useMemo(() => {
-        return lancamentos.filter(l => l.status === 'excluido');
-      }, [lancamentos]);
+      const lancamentosAtivos = useMemo(() => lancamentos.filter(l => l.status === 'ativo' || l.status === null), [lancamentos]);
+      const lancamentosExcluidos = useMemo(() => lancamentos.filter(l => l.status === 'excluido'), [lancamentos]);
 
       const { faturamento, lucroProdutos, totalDespesas, resultadoMes, totalBebidas, totalPratos } = useMemo(() => {
         let fat = 0, lucroP = 0, desp = 0, beb = 0, pratos = 0;
-        
         for (let i = 0; i < lancamentosAtivos.length; i++) {
           const l = lancamentosAtivos[i];
           const val = Number(l.valor_total) || 0;
@@ -339,20 +515,12 @@
             desp += val;
           }
         }
-        return {
-          faturamento: fat,
-          lucroProdutos: lucroP,
-          totalDespesas: desp,
-          resultadoMes: lucroP - desp,
-          totalBebidas: beb,
-          totalPratos: pratos
-        };
+        return { faturamento: fat, lucroProdutos: lucroP, totalDespesas: desp, resultadoMes: lucroP - desp, totalBebidas: beb, totalPratos: pratos };
       }, [lancamentosAtivos]);
 
       const arrayIngredientes = useMemo(() => {
         const mapa = {};
         const prodsMap = new Map(produtos.map(p => [p.id, p]));
-
         lancamentosAtivos.forEach(venda => {
           if (venda.tipo !== 'Venda') return;
           const prod = prodsMap.get(venda.produto_id);
@@ -361,10 +529,7 @@
               const num = parseFloat(ing.quantidade) || 1;
               const totalQtd = num * Number(venda.quantidade || 1);
               const unidade = String(ing.quantidade).replace(/[0-9.,]/g, '').trim() || 'un';
-              
-              if (!mapa[ing.nome]) {
-                mapa[ing.nome] = { qtd: 0, unidade: unidade, custoTotal: 0 };
-              }
+              if (!mapa[ing.nome]) mapa[ing.nome] = { qtd: 0, unidade: unidade, custoTotal: 0 };
               mapa[ing.nome].qtd += totalQtd;
               mapa[ing.nome].custoTotal += (Number(ing.custo || 0) * Number(venda.quantidade || 1));
             });
@@ -389,19 +554,12 @@
         }
 
         const payload = {
-          company_id: compTarget,
-          data: novoLancamento.data, 
-          tipo: novoLancamento.tipo,
-          descricao: desc, 
-          produto_id: novoLancamento.tipo === 'Venda' ? novoLancamento.produto_id : null,
+          company_id: compTarget, data: novoLancamento.data, tipo: novoLancamento.tipo,
+          descricao: desc, produto_id: novoLancamento.tipo === 'Venda' ? novoLancamento.produto_id : null,
           quantidade: novoLancamento.tipo === 'Venda' ? Number(novoLancamento.quantidade) : null,
-          pagamento: novoLancamento.pagamento, 
-          canal_categoria: novoLancamento.canal_categoria,
-          valor_total: total, 
-          custo_total: custo, 
-          resultado: novoLancamento.tipo === 'Venda' ? total - custo : -total,
-          fornecedor: novoLancamento.tipo === 'Despesa' ? novoLancamento.fornecedor : null, 
-          status: 'ativo'
+          pagamento: novoLancamento.pagamento, canal_categoria: novoLancamento.canal_categoria,
+          valor_total: total, custo_total: custo, resultado: novoLancamento.tipo === 'Venda' ? total - custo : -total,
+          fornecedor: novoLancamento.tipo === 'Despesa' ? novoLancamento.fornecedor : null, status: 'ativo'
         };
 
         const { error } = await supabaseClient.from('lancamentos').insert([payload]);
@@ -423,14 +581,7 @@
       async function handleSalvarProduto(e) {
         e.preventDefault();
         const compTarget = effectiveCompanyId || 'cozinha-brasileira';
-        const payload = {
-          company_id: compTarget, 
-          nome: novoProduto.nome,
-          preco_venda: parseFloat(novoProduto.preco_venda), 
-          custo_unitario: parseFloat(novoProduto.custo_unitario), 
-          observacao: novoProduto.observacao,
-          ingredientes: []
-        };
+        const payload = { company_id: compTarget, nome: novoProduto.nome, preco_venda: parseFloat(novoProduto.preco_venda), custo_unitario: parseFloat(novoProduto.custo_unitario), observacao: novoProduto.observacao, ingredientes: [] };
         const { error } = await supabaseClient.from('produtos').insert([payload]);
         if (error) alert("Erro: " + error.message);
         else { carregarTudoEmParalelo(compTarget); setNovoProduto({ nome: '', preco_venda: '', custo_unitario: '', observacao: '' }); }
@@ -439,25 +590,15 @@
       async function handleAtualizarProduto(e) {
         e.preventDefault();
         const compTarget = effectiveCompanyId || 'cozinha-brasileira';
-        const payload = {
-          nome: modalEditarProduto.nome,
-          preco_venda: parseFloat(modalEditarProduto.preco_venda),
-          custo_unitario: parseFloat(modalEditarProduto.custo_unitario),
-          observacao: modalEditarProduto.observacao
-        };
-
+        const payload = { nome: modalEditarProduto.nome, preco_venda: parseFloat(modalEditarProduto.preco_venda), custo_unitario: parseFloat(modalEditarProduto.custo_unitario), observacao: modalEditarProduto.observacao };
         const { error } = await supabaseClient.from('produtos').update(payload).eq('id', modalEditarProduto.id);
-        if (error) alert("Erro ao atualizar produto: " + error.message);
-        else {
-          carregarTudoEmParalelo(compTarget);
-          setModalEditarProduto({ aberto: false, id: null, nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
-        }
+        if (error) alert("Erro ao atualizar: " + error.message);
+        else { carregarTudoEmParalelo(compTarget); setModalEditarProduto({ aberto: false, id: null, nome: '', preco_venda: '', custo_unitario: '', observacao: '' }); }
       }
 
       async function deletarProduto(id) {
         const compTarget = effectiveCompanyId || 'cozinha-brasileira';
-        const temLancamentos = lancamentos.some(l => l.produto_id === id);
-        if (temLancamentos) {
+        if (lancamentos.some(l => l.produto_id === id)) {
           alert("Atenção: Este produto já possui vendas registradas e não pode ser apagado.");
           setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' });
           return;
@@ -472,24 +613,14 @@
         if (!modalFichaTecnica.produto) return;
         const prod = modalFichaTecnica.produto;
         const listaAtual = Array.isArray(prod.ingredientes) ? prod.ingredientes : [];
-        
-        const item = {
-          id: Date.now().toString(),
-          nome: novoInsumo.nome.trim(),
-          quantidade: novoInsumo.quantidade.trim(),
-          custo: parseFloat(novoInsumo.custo) || 0
-        };
-
+        const item = { id: Date.now().toString(), nome: novoInsumo.nome.trim(), quantidade: novoInsumo.quantidade.trim(), custo: parseFloat(novoInsumo.custo) || 0 };
         const novaLista = [...listaAtual, item];
         const novoCustoTotal = novaLista.reduce((acc, curr) => acc + Number(curr.custo || 0), 0);
 
         const { error } = await supabaseClient.from('produtos').update({ ingredientes: novaLista, custo_unitario: novoCustoTotal }).eq('id', prod.id);
-
-        if (error) {
-          alert("Erro ao adicionar ingrediente: " + error.message);
-        } else {
-          const prodAtualizado = { ...prod, ingredientes: novaLista, custo_unitario: novoCustoTotal };
-          setModalFichaTecnica({ aberto: true, produto: prodAtualizado });
+        if (error) alert("Erro: " + error.message);
+        else {
+          setModalFichaTecnica({ aberto: true, produto: { ...prod, ingredientes: novaLista, custo_unitario: novoCustoTotal } });
           setNovoInsumo({ nome: '', quantidade: '', custo: '' });
           carregarTudoEmParalelo(effectiveCompanyId);
         }
@@ -498,17 +629,13 @@
       async function handleRemoverInsumo(insumoId) {
         if (!modalFichaTecnica.produto) return;
         const prod = modalFichaTecnica.produto;
-        const listaAtual = Array.isArray(prod.ingredientes) ? prod.ingredientes : [];
-        const novaLista = listaAtual.filter(i => i.id !== insumoId);
+        const novaLista = (Array.isArray(prod.ingredientes) ? prod.ingredientes : []).filter(i => i.id !== insumoId);
         const novoCustoTotal = novaLista.reduce((acc, curr) => acc + Number(curr.custo || 0), 0);
 
         const { error } = await supabaseClient.from('produtos').update({ ingredientes: novaLista, custo_unitario: novaLista.length > 0 ? novoCustoTotal : prod.custo_unitario }).eq('id', prod.id);
-
-        if (error) {
-          alert("Erro ao remover ingrediente: " + error.message);
-        } else {
-          const prodAtualizado = { ...prod, ingredientes: novaLista, custo_unitario: novaLista.length > 0 ? novoCustoTotal : prod.custo_unitario };
-          setModalFichaTecnica({ aberto: true, produto: prodAtualizado });
+        if (error) alert("Erro: " + error.message);
+        else {
+          setModalFichaTecnica({ aberto: true, produto: { ...prod, ingredientes: novaLista, custo_unitario: novaLista.length > 0 ? novoCustoTotal : prod.custo_unitario } });
           carregarTudoEmParalelo(effectiveCompanyId);
         }
       }
@@ -522,12 +649,7 @@
         setProcessandoFechamento(true);
         const compTarget = effectiveCompanyId || 'cozinha-brasileira';
 
-        await supabaseClient.from('fechamentos').insert([{
-          company_id: compTarget,
-          mes_ano: mesAno,
-          relatorio: { faturamento, despesas: totalDespesas, lucro: resultadoMes, totalPratos, totalBebidas, ingredientes: arrayIngredientes, totalRegistros: lancamentosAtivos.length }
-        }]);
-
+        await supabaseClient.from('fechamentos').insert([{ company_id: compTarget, mes_ano: mesAno, relatorio: { faturamento, despesas: totalDespesas, lucro: resultadoMes, totalPratos, totalBebidas, ingredientes: arrayIngredientes, totalRegistros: lancamentosAtivos.length } }]);
         const ids = lancamentosAtivos.map(l => l.id);
         await supabaseClient.from('lancamentos').update({ status: 'arquivado' }).in('id', ids);
 
@@ -550,7 +672,7 @@
         await supabaseClient.from('companies').insert([{ company_id: cleanSlug, company_name: cleanName, contact_phone: newCompanyPhone.trim(), status: 'ativo' }]);
         await supabaseClient.from('app_users').insert([{ username: newCompanyAdminUser.trim().toLowerCase(), password: newCompanyAdminPass.trim(), role: 'admin', company_id: cleanSlug }]);
 
-        alert(`Restaurante "${cleanName}" registrado com sucesso!`);
+        alert(`Restaurante "${cleanName}" registrado!`);
         setNewCompanyName(''); setNewCompanySlug(''); setNewCompanyPhone(''); setNewCompanyAdminUser(''); setNewCompanyAdminPass('');
         fetchCompanies();
       };
@@ -656,11 +778,7 @@
               </div>
             </div>
 
-            <button 
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
-              className="p-2 text-zinc-300 hover:text-white bg-[#202020] border border-[#333] rounded-lg transition-colors"
-              title="Menu"
-            >
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-zinc-300 hover:text-white bg-[#202020] border border-[#333] rounded-lg transition-colors" title="Menu">
               {mobileMenuOpen ? (
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
               ) : (
@@ -1428,6 +1546,7 @@
                   </div>
                 )}
 
+                {/* SUB-ABA: CONTA & SESSÃO COM FOTO DE PERFIL */}
                 {subAbaConfig === 'conta' && (
                   <div className="bg-[#161616] border border-[#262626] p-5 sm:p-8 rounded-2xl w-full">
                     <div className="flex flex-col lg:flex-row gap-6 sm:gap-10">
@@ -1480,9 +1599,9 @@
             )}
           </main>
 
-          {/* CURSOR MULTIPLAYER */}
-          {window.LiveCursorComponent && isSupportSessionActive && (
-            <window.LiveCursorComponent 
+          {/* CURSOR MULTIPLAYER (ATIVO SOMENTE QUANDO HÁ SUPORTE CONECTADO) */}
+          {isSupportSessionActive && (
+            <LiveCursor 
               companyId={effectiveCompanyId}
               currentUsername={currentUser?.username}
               currentUserRole={currentUser?.role}
@@ -1492,9 +1611,9 @@
             />
           )}
 
-          {/* CHAT DE SUPORTE */}
-          {window.SupportChatComponent && isSupportSessionActive && (
-            <window.SupportChatComponent 
+          {/* CHAT DE SUPORTE (ATIVO SOMENTE QUANDO HÁ SUPORTE CONECTADO) */}
+          {isSupportSessionActive && (
+            <SupportChat 
               companyId={effectiveCompanyId}
               currentUsername={currentUser?.username}
               currentUserRole={currentUser?.role}
