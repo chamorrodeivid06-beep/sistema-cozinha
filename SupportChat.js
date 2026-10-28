@@ -101,9 +101,8 @@ window.SupportChatComponent = function SupportChat({
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
-      {/* JANELA DE CONVERSA */}
       {isOpen && (
-        <div className="w-80 sm:w-96 h-[480px] bg-[#161616] border border-[#2d2d2d] rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-3 animate-in fade-in duration-200">
+        <div className="w-80 sm:w-96 h-[480px] bg-[#161616] border border-[#2d2d2d] rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-3">
           <div className="p-4 bg-[#111111] border-b border-[#262626] flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-full bg-[#D95B1E]/10 border border-[#D95B1E]/30 flex items-center justify-center text-[#D95B1E]">
@@ -115,7 +114,7 @@ window.SupportChatComponent = function SupportChat({
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 </h4>
                 <p className="text-[10px] text-zinc-400">
-                  Sessão ativa com: <strong className="text-[#D95B1E]">{operatorUsername}</strong>
+                  Atendimento: <strong className="text-[#D95B1E]">{operatorUsername}</strong>
                 </p>
               </div>
             </div>
@@ -183,10 +182,9 @@ window.SupportChatComponent = function SupportChat({
         </div>
       )}
 
-      {/* BOTÃO FLUTUANTE */}
       <button
         onClick={handleToggleOpen}
-        className="w-14 h-14 rounded-full bg-[#D95B1E] hover:bg-[#c34e17] text-white shadow-2xl flex items-center justify-center transition-transform hover:scale-105 active:scale-95 relative border-2 border-orange-400/30"
+        className="w-14 h-14 rounded-full bg-[#D95B1E] hover:bg-[#c34e17] text-white shadow-2xl flex items-center justify-center transition-transform hover:scale-105 active:scale-95 relative border-2 border-orange-400/30 cursor-pointer"
         title="Abrir Chat de Suporte"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -199,3 +197,6 @@ window.SupportChatComponent = function SupportChat({
     </div>
   );
 };
+
+// Notifica a aplicação quando o ficheiro estiver pronto
+window.dispatchEvent(new Event('support-chat-loaded'));
