@@ -11,9 +11,6 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- CARREGANDO O ARQUIVO SEPARADO DE FECHAMENTO -->
-  <script type="text/babel" src="Fechamento.js"></script>
-
   <style>
     body { background-color: #0f0f0f; color: #f5f5f5; font-family: sans-serif; }
     .btn-orange { background-color: #D95B1E; color: white; }
@@ -51,14 +48,16 @@
       const [showPassword, setShowPassword] = useState(false);
       const [authError, setAuthError] = useState('');
 
-      // Navegação (Adicionado 'fechamento')
+      // Navegação Principal
       const [abaAtiva, setAbaAtiva] = useState('painel'); 
       const [subAbaConfig, setSubAbaConfig] = useState('conta'); 
 
-      // Dados
+      // Dados Operacionais
       const [produtos, setProdutos] = useState([]);
       const [lancamentos, setLancamentos] = useState([]);
+      const [historicoFechamentos, setHistoricoFechamentos] = useState([]);
       const [carregando, setCarregando] = useState(false);
+      const [processandoFechamento, setProcessandoFechamento] = useState(false);
 
       // Modais
       const [modalExclusao, setModalExclusao] = useState({ aberto: false, idLancamento: null });
@@ -87,6 +86,7 @@
         nome: '', preco_venda: '', custo_unitario: '', observacao: ''
       });
 
+      // Gestão Master (B2B)
       const [companiesList, setCompaniesList] = useState([]);
       const [newCompanyName, setNewCompanyName] = useState('');
       const [newCompanySlug, setNewCompanySlug] = useState('');
@@ -99,9 +99,6 @@
       const isSuperAdmin = currentUser?.role === 'superadmin';
       const effectiveCompanyId = impersonatedCompany ? impersonatedCompany.company_id : currentUser?.company_id;
       const effectiveCompanyName = impersonatedCompany ? impersonatedCompany.company_name : (currentUser?.unidade || 'FoodStrick');
-
-      // Variavel do componente externo
-      const FechamentoComponent = window.FechamentoMensalComponent;
 
       useEffect(() => {
         const saved = localStorage.getItem('foodstrick_master_session');
@@ -122,6 +119,7 @@
       useEffect(() => {
         if (isAuthenticated && effectiveCompanyId && effectiveCompanyId !== 'foodstrick-master') {
           carregarDadosOperacionais(effectiveCompanyId);
+          carregarHistoricoFechamentos(effectiveCompanyId);
         }
       }, [isAuthenticated, effectiveCompanyId]);
 
@@ -131,16 +129,47 @@
           let prodsData = [];
           let lancsData = [];
 
-          const resProd = await supabaseClient.from('produtos').select('*').or(`company_id.eq.${compId},company_id.eq.cozinha-brasileira,company_id.is.null`).order('nome');
-          const resLanc = await supabaseClient.from('lancamentos').select('*').or(`company_id.eq.${compId},company_id.eq.cozinha-brasileira,company_id.is.null`).order('data', { ascending: false });
+          const resProd = await supabaseClient
+            .from('produtos')
+            .select('*')
+            .or(`company_id.eq.${compId},company_id.eq.cozinha-brasileira,company_id.is.null`)
+            .order('nome');
+
+          const resLanc = await supabaseClient
+            .from('lancamentos')
+            .select('*')
+            .or(`company_id.eq.${compId},company_id.eq.cozinha-brasileira,company_id.is.null`)
+            .order('data', { ascending: false });
 
           if (!resProd.error && resProd.data) prodsData = resProd.data;
+          else {
+            const fallbackProd = await supabaseClient.from('produtos').select('*').order('nome');
+            if (fallbackProd.data) prodsData = fallbackProd.data;
+          }
+
           if (!resLanc.error && resLanc.data) lancsData = resLanc.data;
+          else {
+            const fallbackLanc = await supabaseClient.from('lancamentos').select('*').order('data', { ascending: false });
+            if (fallbackLanc.data) lancsData = fallbackLanc.data;
+          }
 
           setProdutos(prodsData);
           setLancamentos(lancsData);
-        } catch (err) {}
+        } catch (err) {
+          console.error("Erro no carregamento:", err);
+        }
         setCarregando(false);
+      }
+
+      async function carregarHistoricoFechamentos(compId) {
+        try {
+          const { data } = await supabaseClient
+            .from('fechamentos')
+            .select('*')
+            .eq('company_id', compId)
+            .order('data_fechamento', { ascending: false });
+          if (data) setHistoricoFechamentos(data);
+        } catch (err) {}
       }
 
       // --- AUTENTICAÇÃO ---
@@ -176,13 +205,20 @@
         }
 
         try {
-          const { data: userData } = await supabaseClient.from('app_users').select('*').ilike('username', cleanUser).eq('password', password).maybeSingle();
+          const { data: userData } = await supabaseClient
+            .from('app_users')
+            .select('*')
+            .ilike('username', cleanUser)
+            .eq('password', password)
+            .maybeSingle();
+
           if (userData) {
             const { data: comp } = await supabaseClient.from('companies').select('*').eq('company_id', userData.company_id).maybeSingle();
             if (comp && comp.status === 'bloqueado') {
               setAuthError('Acesso bloqueado: este estabelecimento está suspenso.');
               return;
             }
+
             const userObj = { 
               username: userData.username, 
               role: userData.role || 'operador', 
@@ -198,7 +234,7 @@
           }
         } catch (err) {}
 
-        setAuthError('Usuário ou senha incorretos.');
+        setAuthError('Utilizador ou palavra-passe incorretos.');
       };
 
       const handleLogout = () => {
@@ -210,7 +246,7 @@
         setProdutos([]); setLancamentos([]);
       };
 
-      // CÁLCULOS
+      // Cálculos Financeiros (Apenas os que não foram arquivados ou excluídos)
       const lancamentosAtivos = lancamentos.filter(l => l.status === 'ativo' || l.status === null);
       const lancamentosExcluidos = lancamentos.filter(l => l.status === 'excluido');
 
@@ -219,7 +255,29 @@
       const totalDespesas = lancamentosAtivos.filter(l => l.tipo === 'Despesa').reduce((acc, curr) => acc + Number(curr.valor_total), 0);
       const resultadoMes = lucroProdutos - totalDespesas;
 
-      // OPERAÇÕES LANÇAMENTO E PRODUTO (Omitidas por espaço - mantidas inalteradas)
+      // Cálculos para o Fechamento Mensal
+      const totalBebidas = lancamentosAtivos.filter(l => l.tipo === 'Venda' && l.canal_categoria === 'Bebidas').reduce((acc, curr) => acc + Number(curr.quantidade || 0), 0);
+      const totalPratos = lancamentosAtivos.filter(l => l.tipo === 'Venda' && l.canal_categoria !== 'Bebidas').reduce((acc, curr) => acc + Number(curr.quantidade || 0), 0);
+
+      let ingredientesUsados = {};
+      lancamentosAtivos.filter(l => l.tipo === 'Venda').forEach(venda => {
+        const prod = produtos.find(p => p.id === venda.produto_id);
+        if (prod && Array.isArray(prod.ingredientes)) {
+          prod.ingredientes.forEach(ing => {
+            const num = parseFloat(ing.quantidade) || 1;
+            const totalQtd = num * Number(venda.quantidade || 1);
+            const unidade = String(ing.quantidade).replace(/[0-9.,]/g, '').trim() || 'un';
+            
+            if (!ingredientesUsados[ing.nome]) {
+              ingredientesUsados[ing.nome] = { qtd: 0, unidade: unidade, custoTotal: 0 };
+            }
+            ingredientesUsados[ing.nome].qtd += totalQtd;
+            ingredientesUsados[ing.nome].custoTotal += (Number(ing.custo || 0) * Number(venda.quantidade || 1));
+          });
+        }
+      });
+      const arrayIngredientes = Object.entries(ingredientesUsados).sort((a, b) => b[1].qtd - a[1].qtd);
+
       async function handleSalvarLancamento(e) {
         e.preventDefault();
         const compTarget = effectiveCompanyId || 'cozinha-brasileira';
@@ -236,16 +294,27 @@
         }
 
         const payload = {
-          company_id: compTarget, data: novoLancamento.data, tipo: novoLancamento.tipo,
-          descricao: desc, produto_id: novoLancamento.tipo === 'Venda' ? novoLancamento.produto_id : null,
+          company_id: compTarget,
+          data: novoLancamento.data, 
+          tipo: novoLancamento.tipo,
+          descricao: desc, 
+          produto_id: novoLancamento.tipo === 'Venda' ? novoLancamento.produto_id : null,
           quantidade: novoLancamento.tipo === 'Venda' ? Number(novoLancamento.quantidade) : null,
-          pagamento: novoLancamento.pagamento, canal_categoria: novoLancamento.canal_categoria,
-          valor_total: total, custo_total: custo, resultado: novoLancamento.tipo === 'Venda' ? total - custo : -total,
-          fornecedor: novoLancamento.tipo === 'Despesa' ? novoLancamento.fornecedor : null, status: 'ativo'
+          pagamento: novoLancamento.pagamento, 
+          canal_categoria: novoLancamento.canal_categoria,
+          valor_total: total, 
+          custo_total: custo, 
+          resultado: novoLancamento.tipo === 'Venda' ? total - custo : -total,
+          fornecedor: novoLancamento.tipo === 'Despesa' ? novoLancamento.fornecedor : null, 
+          status: 'ativo'
         };
+
         const { error } = await supabaseClient.from('lancamentos').insert([payload]);
         if (error) alert("Erro: " + error.message);
-        else { carregarDadosOperacionais(compTarget); setNovoLancamento({ ...novoLancamento, descricao: '', valor_despesa: '', quantidade: 1, produto_id: '', fornecedor: '' }); }
+        else {
+          carregarDadosOperacionais(compTarget);
+          setNovoLancamento({ ...novoLancamento, descricao: '', valor_despesa: '', quantidade: 1, produto_id: '', fornecedor: '' });
+        }
       }
 
       async function confirmarExclusao() {
@@ -260,8 +329,12 @@
         e.preventDefault();
         const compTarget = effectiveCompanyId || 'cozinha-brasileira';
         const payload = {
-          company_id: compTarget, nome: novoProduto.nome, preco_venda: parseFloat(novoProduto.preco_venda), 
-          custo_unitario: parseFloat(novoProduto.custo_unitario), observacao: novoProduto.observacao, ingredientes: []
+          company_id: compTarget, 
+          nome: novoProduto.nome,
+          preco_venda: parseFloat(novoProduto.preco_venda), 
+          custo_unitario: parseFloat(novoProduto.custo_unitario), 
+          observacao: novoProduto.observacao,
+          ingredientes: []
         };
         const { error } = await supabaseClient.from('produtos').insert([payload]);
         if (error) alert("Erro: " + error.message);
@@ -272,18 +345,25 @@
         e.preventDefault();
         const compTarget = effectiveCompanyId || 'cozinha-brasileira';
         const payload = {
-          nome: modalEditarProduto.nome, preco_venda: parseFloat(modalEditarProduto.preco_venda),
-          custo_unitario: parseFloat(modalEditarProduto.custo_unitario), observacao: modalEditarProduto.observacao
+          nome: modalEditarProduto.nome,
+          preco_venda: parseFloat(modalEditarProduto.preco_venda),
+          custo_unitario: parseFloat(modalEditarProduto.custo_unitario),
+          observacao: modalEditarProduto.observacao
         };
+
         const { error } = await supabaseClient.from('produtos').update(payload).eq('id', modalEditarProduto.id);
         if (error) alert("Erro ao atualizar produto: " + error.message);
-        else { carregarDadosOperacionais(compTarget); setModalEditarProduto({ aberto: false, id: null, nome: '', preco_venda: '', custo_unitario: '', observacao: '' }); }
+        else {
+          carregarDadosOperacionais(compTarget);
+          setModalEditarProduto({ aberto: false, id: null, nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
+        }
       }
 
       async function deletarProduto(id) {
         const compTarget = effectiveCompanyId || 'cozinha-brasileira';
-        if (lancamentos.some(l => l.produto_id === id)) {
-          alert("Atenção: Este produto já possui vendas registradas e não pode ser apagado.");
+        const temLancamentos = lancamentos.some(l => l.produto_id === id);
+        if (temLancamentos) {
+          alert("Atenção: Este produto já possui vendas registadas e não pode ser apagado para manter os relatórios corretos.");
           setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' });
           return;
         }
@@ -292,20 +372,35 @@
         else { carregarDadosOperacionais(compTarget); setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' }); }
       }
 
-      // FICHA TÉCNICA
       async function handleAdicionarInsumo(e) {
         e.preventDefault();
         if (!modalFichaTecnica.produto) return;
         const prod = modalFichaTecnica.produto;
         const listaAtual = Array.isArray(prod.ingredientes) ? prod.ingredientes : [];
-        const item = { id: Date.now().toString(), nome: novoInsumo.nome.trim(), quantidade: novoInsumo.quantidade.trim(), custo: parseFloat(novoInsumo.custo) || 0 };
+        
+        const item = {
+          id: Date.now().toString(),
+          nome: novoInsumo.nome.trim(),
+          quantidade: novoInsumo.quantidade.trim(),
+          custo: parseFloat(novoInsumo.custo) || 0
+        };
+
         const novaLista = [...listaAtual, item];
         const novoCustoTotal = novaLista.reduce((acc, curr) => acc + Number(curr.custo || 0), 0);
 
-        const { error } = await supabaseClient.from('produtos').update({ ingredientes: novaLista, custo_unitario: novoCustoTotal }).eq('id', prod.id);
-        if (error) alert("Erro: " + error.message);
-        else {
-          setModalFichaTecnica({ aberto: true, produto: { ...prod, ingredientes: novaLista, custo_unitario: novoCustoTotal } });
+        const { error } = await supabaseClient
+          .from('produtos')
+          .update({ 
+            ingredientes: novaLista,
+            custo_unitario: novoCustoTotal 
+          })
+          .eq('id', prod.id);
+
+        if (error) {
+          alert("Erro ao adicionar ingrediente: " + error.message);
+        } else {
+          const prodAtualizado = { ...prod, ingredientes: novaLista, custo_unitario: novoCustoTotal };
+          setModalFichaTecnica({ aberto: true, produto: prodAtualizado });
           setNovoInsumo({ nome: '', quantidade: '', custo: '' });
           carregarDadosOperacionais(effectiveCompanyId);
         }
@@ -314,25 +409,175 @@
       async function handleRemoverInsumo(insumoId) {
         if (!modalFichaTecnica.produto) return;
         const prod = modalFichaTecnica.produto;
-        const novaLista = (Array.isArray(prod.ingredientes) ? prod.ingredientes : []).filter(i => i.id !== insumoId);
+        const listaAtual = Array.isArray(prod.ingredientes) ? prod.ingredientes : [];
+        const novaLista = listaAtual.filter(i => i.id !== insumoId);
         const novoCustoTotal = novaLista.reduce((acc, curr) => acc + Number(curr.custo || 0), 0);
 
-        const { error } = await supabaseClient.from('produtos').update({ ingredientes: novaLista, custo_unitario: novaLista.length > 0 ? novoCustoTotal : prod.custo_unitario }).eq('id', prod.id);
-        if (error) alert("Erro: " + error.message);
-        else {
-          setModalFichaTecnica({ aberto: true, produto: { ...prod, ingredientes: novaLista, custo_unitario: novaLista.length > 0 ? novoCustoTotal : prod.custo_unitario } });
+        const { error } = await supabaseClient
+          .from('produtos')
+          .update({ 
+            ingredientes: novaLista,
+            custo_unitario: novaLista.length > 0 ? novoCustoTotal : prod.custo_unitario 
+          })
+          .eq('id', prod.id);
+
+        if (error) {
+          alert("Erro ao remover ingrediente: " + error.message);
+        } else {
+          const prodAtualizado = { 
+            ...prod, 
+            ingredientes: novaLista, 
+            custo_unitario: novaLista.length > 0 ? novoCustoTotal : prod.custo_unitario 
+          };
+          setModalFichaTecnica({ aberto: true, produto: prodAtualizado });
           carregarDadosOperacionais(effectiveCompanyId);
         }
       }
 
-      // B2B E FOTOS OMITIDOS PARA ESPAÇO, MANTENDO A ESTRUTURA IGUAL
-      const fetchCompanies = async () => { const { data } = await supabaseClient.from('companies').select('*').order('created_at', { ascending: false }); if (data) setCompaniesList(data); };
-      const handleCreateCompanyB2B = async (e) => { /*...mesmo código...*/ };
-      const handleToggleCompanyStatus = async (id, currentStatus) => { /*...mesmo código...*/ };
-      const handleAvatarUpload = (e) => { /*...mesmo código de compressão e upload...*/ };
-      const handleRemoveAvatar = async () => { /*...mesmo código...*/ };
+      // Execução do Fechamento Mensal
+      async function handleExecutarFechamento() {
+        if (lancamentosAtivos.length === 0) {
+          return alert("Não existem lançamentos ativos para fechar neste momento.");
+        }
 
+        const dataAtual = new Date();
+        const mesAno = `${dataAtual.getMonth() + 1}/${dataAtual.getFullYear()}`;
+        const confirmacao = window.confirm(`Confirma o encerramento das contas de ${mesAno}?\nOs lançamentos atuais serão arquivados para iniciar o próximo ciclo com o painel zerado.`);
+        
+        if (!confirmacao) return;
+        setProcessandoFechamento(true);
 
+        const relatorioCompleto = {
+          faturamento,
+          despesas,
+          lucro: resultadoMes,
+          totalPratos,
+          totalBebidas,
+          ingredientes: arrayIngredientes,
+          totalRegistros: lancamentosAtivos.length
+        };
+
+        const compTarget = effectiveCompanyId || 'cozinha-brasileira';
+
+        const { error: errInsert } = await supabaseClient.from('fechamentos').insert([{
+          company_id: compTarget,
+          mes_ano: mesAno,
+          relatorio: relatorioCompleto
+        }]);
+
+        if (errInsert) {
+          alert("Erro ao registar fechamento: " + errInsert.message);
+          setProcessandoFechamento(false);
+          return;
+        }
+
+        const idsParaArquivar = lancamentosAtivos.map(l => l.id);
+        const { error: errUpdate } = await supabaseClient
+          .from('lancamentos')
+          .update({ status: 'arquivado' })
+          .in('id', idsParaArquivar);
+
+        if (errUpdate) {
+          alert("Erro ao arquivar lançamentos: " + errUpdate.message);
+        } else {
+          alert("Fechamento do mês concluído com sucesso! O painel e lançamentos foram zerados.");
+          carregarDadosOperacionais(compTarget);
+          carregarHistoricoFechamentos(compTarget);
+        }
+        setProcessandoFechamento(false);
+      }
+
+      // Gestão B2B
+      const fetchCompanies = async () => {
+        const { data } = await supabaseClient.from('companies').select('*').order('created_at', { ascending: false });
+        if (data) setCompaniesList(data);
+      };
+
+      const handleCreateCompanyB2B = async (e) => {
+        e.preventDefault();
+        const cleanName = newCompanyName.trim();
+        let cleanSlug = newCompanySlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+        const cleanAdmin = newCompanyAdminUser.trim().toLowerCase();
+        
+        if (!cleanSlug) cleanSlug = cleanName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-');
+
+        const { error: compError } = await supabaseClient.from('companies').insert([
+          { company_id: cleanSlug, company_name: cleanName, contact_phone: newCompanyPhone.trim(), status: 'ativo' }
+        ]);
+        if (compError) return alert("Erro ao criar empresa: " + compError.message);
+
+        await supabaseClient.from('app_users').insert([
+          { username: cleanAdmin, password: newCompanyAdminPass.trim(), role: 'admin', company_id: cleanSlug }
+        ]);
+
+        alert(`Restaurante "${cleanName}" registado com sucesso!`);
+        setNewCompanyName(''); setNewCompanySlug(''); setNewCompanyPhone(''); setNewCompanyAdminUser(''); setNewCompanyAdminPass('');
+        fetchCompanies();
+      };
+
+      const handleToggleCompanyStatus = async (id, currentStatus) => {
+        const nextStatus = currentStatus === 'ativo' ? 'bloqueado' : 'ativo';
+        await supabaseClient.from('companies').update({ status: nextStatus }).eq('id', id);
+        fetchCompanies();
+      };
+
+      // Foto de Perfil
+      const handleAvatarUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file || !currentUser) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = async () => {
+            const canvas = document.createElement('canvas');
+            const maxSize = 250;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > maxSize) { height = Math.round((height * maxSize) / width); width = maxSize; }
+            } else {
+              if (height > maxSize) { width = Math.round((width * maxSize) / height); height = maxSize; }
+            }
+
+            canvas.width = width; canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+            const updatedUser = { ...currentUser, avatar_url: compressedBase64 };
+            
+            setCurrentUser(updatedUser);
+            localStorage.setItem('foodstrick_master_session', JSON.stringify(updatedUser));
+
+            if(currentUser.username === 'Admin Cozinha' || currentUser.username === 'cozinha') {
+              await supabaseClient.from('app_users').update({ avatar_url: compressedBase64 }).eq('username', 'cozinha');
+            } else {
+              await supabaseClient.from('app_users').update({ avatar_url: compressedBase64 }).eq('username', currentUser.username);
+            }
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      };
+
+      const handleRemoveAvatar = async () => {
+        if (!currentUser) return;
+        const updatedUser = { ...currentUser, avatar_url: null };
+        setCurrentUser(updatedUser);
+        localStorage.setItem('foodstrick_master_session', JSON.stringify(updatedUser));
+
+        if(currentUser.username === 'Admin Cozinha' || currentUser.username === 'cozinha') {
+          await supabaseClient.from('app_users').update({ avatar_url: null }).eq('username', 'cozinha');
+        } else {
+          await supabaseClient.from('app_users').update({ avatar_url: null }).eq('username', currentUser.username);
+        }
+      };
+
+      // ==========================
+      // ECRÃ DE LOGIN
+      // ==========================
       if (!isAuthenticated) {
         return (
           <div className="min-h-screen w-full flex items-center justify-start p-6 md:p-16 lg:p-24 relative bg-cover bg-center" style={{ backgroundImage: `url("${LOGIN_BG_IMAGE}")` }}>
@@ -350,29 +595,304 @@
               {authError && <div className="mb-4 p-3 bg-red-950/60 border border-red-800 text-red-300 rounded-lg text-xs font-medium text-center">{authError}</div>}
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">Usuário</label>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">Utilizador</label>
                   <input type="text" placeholder="admin ou cozinha" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full bg-[#202020] text-white text-sm px-4 py-2.5 rounded-lg border border-[#333] focus:border-[#D95B1E] outline-none" required />
                 </div>
                 <div className="relative">
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">Senha</label>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">Palavra-passe</label>
                   <input type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-[#202020] text-white text-sm px-4 py-2.5 pr-10 rounded-lg border border-[#333] focus:border-[#D95B1E] outline-none" required />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-8 text-zinc-400 hover:text-white">
-                    {showPassword ? <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg> : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>}
+                    {showPassword ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    )}
                   </button>
                 </div>
-                <button type="submit" className="w-full btn-orange font-bold py-3 rounded-lg text-sm tracking-wide shadow-lg transition-all mt-2">Acessar Sistema</button>
+                <button type="submit" className="w-full btn-orange font-bold py-3 rounded-lg text-sm tracking-wide shadow-lg transition-all mt-2">Aceder ao Sistema</button>
               </form>
             </div>
           </div>
         );
       }
 
+      // ==========================
+      // SISTEMA PRINCIPAL
+      // ==========================
       return (
         <div className="flex flex-col md:flex-row min-h-screen relative">
           
-          {/* MODAIS AQUI (EXCLUSÃO, PRODUTO E FICHA TÉCNICA) - Mantidos idênticos */}
-          
-          {/* SIDEBAR */}
+          {/* MODAL EXCLUSÃO LANÇAMENTO */}
+          {modalExclusao.aberto && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+              <div className="bg-[#171717] border border-[#333] rounded-xl p-6 w-full max-w-md shadow-2xl">
+                <h3 className="text-lg font-bold text-white mb-2">Excluir Lançamento</h3>
+                <p className="text-xs text-zinc-400 mb-5">Indique o motivo da exclusão:</p>
+                <div className="space-y-2 mb-6">
+                  {['Pedido cancelado', 'Erro de principiante', 'Erro técnico', 'Outro'].map(motivo => (
+                    <label key={motivo} className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${motivoExclusao === motivo ? 'border-[#D95B1E] bg-[#D95B1E]/10' : 'border-[#2d2d2d] hover:bg-[#202020]'}`}>
+                      <input type="radio" name="motivo" value={motivo} checked={motivoExclusao === motivo} onChange={(e) => setMotivoExclusao(e.target.value)} className="text-[#D95B1E]" />
+                      <span className="ml-3 text-xs text-white font-medium">{motivo}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => setModalExclusao({ aberto: false, idLancamento: null })} className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white">Cancelar</button>
+                  <button onClick={confirmarExclusao} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold">Confirmar</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL DE FICHA TÉCNICA (INGREDIENTES DO PRATO) */}
+          {modalFichaTecnica.aberto && modalFichaTecnica.produto && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 overflow-y-auto">
+              <div className="bg-[#161616] border border-[#2d2d2d] rounded-2xl p-6 w-full max-w-2xl shadow-2xl my-8">
+                
+                <div className="flex items-center justify-between pb-4 border-b border-[#262626] mb-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-950/60 border border-emerald-800/50 flex items-center justify-center text-emerald-400">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white">Ficha Técnica: {modalFichaTecnica.produto.nome}</h3>
+                      <p className="text-xs text-zinc-400">Composição de ingredientes, quantidades e custo individual</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setModalFichaTecnica({ aberto: false, produto: null })}
+                    className="p-1.5 text-zinc-400 hover:text-white rounded-lg transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                  </button>
+                </div>
+
+                {(() => {
+                  const ingList = Array.isArray(modalFichaTecnica.produto.ingredientes) ? modalFichaTecnica.produto.ingredientes : [];
+                  const somaCusto = ingList.reduce((acc, curr) => acc + Number(curr.custo || 0), 0);
+                  const precoVenda = Number(modalFichaTecnica.produto.preco_venda || 0);
+                  const margemRs = precoVenda - (ingList.length > 0 ? somaCusto : Number(modalFichaTecnica.produto.custo_unitario || 0));
+                  const margemPct = precoVenda > 0 ? ((margemRs / precoVenda) * 100).toFixed(1) : 0;
+
+                  return (
+                    <div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                        <div className="bg-[#202020] border border-[#2d2d2d] p-3 rounded-xl">
+                          <span className="text-[10px] uppercase font-bold text-zinc-400 block tracking-wider">Total de Insumos</span>
+                          <span className="text-xl font-bold text-white mt-1 block">{ingList.length} itens</span>
+                        </div>
+                        <div className="bg-[#202020] border border-[#2d2d2d] p-3 rounded-xl">
+                          <span className="text-[10px] uppercase font-bold text-zinc-400 block tracking-wider">Custo dos Ingredientes</span>
+                          <span className="text-xl font-bold text-emerald-400 mt-1 block">R$ {somaCusto.toFixed(2)}</span>
+                        </div>
+                        <div className="bg-[#202020] border border-[#2d2d2d] p-3 rounded-xl">
+                          <span className="text-[10px] uppercase font-bold text-zinc-400 block tracking-wider">Margem Bruta</span>
+                          <span className="text-xl font-bold text-[#D95B1E] mt-1 block">R$ {margemRs.toFixed(2)} ({margemPct}%)</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-[#1c1c1c] border border-[#262626] rounded-xl overflow-hidden mb-6">
+                        <div className="px-4 py-3 border-b border-[#262626] flex items-center justify-between">
+                          <span className="text-xs font-bold text-white uppercase tracking-wider">Lista de Ingredientes</span>
+                          <span className="text-[11px] text-zinc-400">Custo Total: <strong className="text-emerald-400">R$ {somaCusto.toFixed(2)}</strong></span>
+                        </div>
+
+                        {ingList.length === 0 ? (
+                          <div className="p-8 text-center text-xs text-zinc-500 italic">
+                            Nenhum ingrediente adicionado à ficha técnica deste produto ainda. Adicione os insumos abaixo!
+                          </div>
+                        ) : (
+                          <div className="max-h-52 overflow-y-auto divide-y divide-[#262626]">
+                            {ingList.map((insumo, index) => (
+                              <div key={insumo.id || index} className="px-4 py-2.5 flex items-center justify-between hover:bg-[#222] transition-colors">
+                                <div className="flex items-center gap-3">
+                                  <span className="w-5 h-5 rounded-full bg-zinc-800 text-[10px] font-bold text-zinc-400 flex items-center justify-center">
+                                    {index + 1}
+                                  </span>
+                                  <div>
+                                    <span className="text-xs font-bold text-white block">{insumo.nome}</span>
+                                    <span className="text-[11px] text-zinc-400 font-medium">Qtd: {insumo.quantidade}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                  <span className="text-xs font-bold text-white font-mono">R$ {Number(insumo.custo).toFixed(2)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoverInsumo(insumo.id)}
+                                    className="p-1 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
+                                    title="Remover ingrediente"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <form onSubmit={handleAdicionarInsumo} className="bg-[#202020] border border-[#2d2d2d] p-4 rounded-xl space-y-3">
+                        <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                          Adicionar Ingrediente / Insumo
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-medium text-zinc-400 mb-1">Ingrediente</label>
+                            <input 
+                              type="text" 
+                              placeholder="Ex: Pão Brioche, Carne 150g..." 
+                              value={novoInsumo.nome} 
+                              onChange={(e) => setNovoInsumo({ ...novoInsumo, nome: e.target.value })} 
+                              className="w-full bg-[#161616] border border-[#333] rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500" 
+                              required 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-medium text-zinc-400 mb-1">Quantidade</label>
+                            <input 
+                              type="text" 
+                              placeholder="Ex: 1 un, 150g, 2 fatias..." 
+                              value={novoInsumo.quantidade} 
+                              onChange={(e) => setNovoInsumo({ ...novoInsumo, quantidade: e.target.value })} 
+                              className="w-full bg-[#161616] border border-[#333] rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500" 
+                              required 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-medium text-zinc-400 mb-1">Custo (R$)</label>
+                            <input 
+                              type="number" 
+                              step="0.01" 
+                              placeholder="0.00" 
+                              value={novoInsumo.custo} 
+                              onChange={(e) => setNovoInsumo({ ...novoInsumo, custo: e.target.value })} 
+                              className="w-full bg-[#161616] border border-[#333] rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500" 
+                              required 
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end pt-1">
+                          <button 
+                            type="submit" 
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-lg text-xs transition-all shadow-md flex items-center gap-1.5"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                            Adicionar à Ficha
+                          </button>
+                        </div>
+                      </form>
+
+                      <div className="flex justify-end pt-5">
+                        <button 
+                          type="button" 
+                          onClick={() => setModalFichaTecnica({ aberto: false, produto: null })} 
+                          className="px-5 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-semibold"
+                        >
+                          Concluir Ficha Técnica
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+              </div>
+            </div>
+          )}
+
+          {/* MODAL DE EDIÇÃO DE PRODUTO (LÁPIS) */}
+          {modalEditarProduto.aberto && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+              <div className="bg-[#171717] border border-[#333] rounded-xl p-6 w-full max-w-md shadow-2xl">
+                <div className="flex items-center gap-2 mb-2 text-white">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D95B1E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                  <h3 className="text-lg font-bold">Editar Produto & Preços</h3>
+                </div>
+                <p className="text-xs text-zinc-400 mb-5">Altere os dados de venda e ficha técnica deste item.</p>
+
+                <form onSubmit={handleAtualizarProduto} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">Nome do Item</label>
+                    <input 
+                      type="text" 
+                      value={modalEditarProduto.nome} 
+                      onChange={(e) => setModalEditarProduto({ ...modalEditarProduto, nome: e.target.value })} 
+                      className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none focus:border-[#D95B1E]" 
+                      required 
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Preço Venda (R$)</label>
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        value={modalEditarProduto.preco_venda} 
+                        onChange={(e) => setModalEditarProduto({ ...modalEditarProduto, preco_venda: e.target.value })} 
+                        className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none focus:border-[#D95B1E]" 
+                        required 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Custo Insumo (R$)</label>
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        value={modalEditarProduto.custo_unitario} 
+                        onChange={(e) => setModalEditarProduto({ ...modalEditarProduto, custo_unitario: e.target.value })} 
+                        className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none focus:border-[#D95B1E]" 
+                        required 
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">Observação</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ex: Ficha técnica atualizada..." 
+                      value={modalEditarProduto.observacao} 
+                      onChange={(e) => setModalEditarProduto({ ...modalEditarProduto, observacao: e.target.value })} 
+                      className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none focus:border-[#D95B1E]" 
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button 
+                      type="button" 
+                      onClick={() => setModalEditarProduto({ aberto: false, id: null, nome: '', preco_venda: '', custo_unitario: '', observacao: '' })} 
+                      className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="px-5 py-2 btn-orange rounded-lg text-xs font-bold shadow-md"
+                    >
+                      Salvar Alterações
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL EXCLUSÃO PRODUTO */}
+          {modalExcluirProduto.aberto && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+              <div className="bg-[#171717] border border-[#333] rounded-xl p-6 w-full max-w-md shadow-2xl">
+                <h3 className="text-lg font-bold text-white mb-2">Eliminar Produto</h3>
+                <p className="text-xs text-zinc-400 mb-6">Pretende remover <strong className="text-white">"{modalExcluirProduto.nome}"</strong>?</p>
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' })} className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white">Cancelar</button>
+                  <button onClick={() => deletarProduto(modalExcluirProduto.idProduto)} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold">Eliminar</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* BARRA LATERAL (SIDEBAR) */}
           <aside className="w-full md:w-64 bg-[#141414] border-r border-[#242424] p-5 flex flex-col justify-between shrink-0 h-screen sticky top-0 overflow-y-auto z-20">
             <div>
               <div className="flex items-center gap-3 pb-6 border-b border-[#242424]">
@@ -390,20 +910,24 @@
               {(!isSuperAdmin || impersonatedCompany) && (
                 <nav className="mt-6 space-y-1.5">
                   <button onClick={() => setAbaAtiva('painel')} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'painel' ? 'btn-orange shadow-md' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg> Painel Geral
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                    Painel Geral
                   </button>
                   <button onClick={() => setAbaAtiva('lancamentos')} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'lancamentos' ? 'btn-orange shadow-md' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17V7"/></svg> Lançamentos
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17V7"/></svg>
+                    Lançamentos
                   </button>
                   <button onClick={() => setAbaAtiva('produtos')} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'produtos' ? 'btn-orange shadow-md' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> Produtos & Custos
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                    Produtos & Custos
                   </button>
                   <button onClick={() => setAbaAtiva('fichas')} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'fichas' ? 'btn-orange shadow-md' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg> Fichas Técnicas
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
+                    Fichas Técnicas
                   </button>
-                  {/* BOTÃO NOVO: FECHAMENTO MENSAL */}
                   <button onClick={() => setAbaAtiva('fechamento')} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'fechamento' ? 'btn-orange shadow-md' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg> Fechamento Mensal
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
+                    Fechamento Mensal
                   </button>
                 </nav>
               )}
@@ -416,38 +940,65 @@
               </button>
               <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-xs font-medium text-zinc-500 hover:text-red-400 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                Terminar Sessão
+                Terminar Sessão ({currentUser?.username})
               </button>
             </div>
           </aside>
 
-          {/* ... [Sub-sidebar de Configurações, idêntica ao código anterior] ... */}
-          
+          {/* SUB-SIDEBAR (Configurações) */}
+          {abaAtiva === 'configuracoes' && (
+            <aside className="w-full md:w-56 bg-[#111111] border-r border-[#242424] p-5 shrink-0 hidden md:block h-screen sticky top-0 overflow-y-auto z-10">
+              <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4">Ajustes & Gestão</h3>
+              <nav className="space-y-1">
+                {(!isSuperAdmin || impersonatedCompany) && (
+                  <button onClick={() => setSubAbaConfig('exclusoes')} className={`w-full text-left px-3 py-2 rounded-md text-xs font-medium ${subAbaConfig === 'exclusoes' ? 'bg-[#202020] text-[#D95B1E]' : 'text-zinc-400 hover:text-white'}`}>
+                    Exclusões (Lixeira)
+                  </button>
+                )}
+                <button onClick={() => setSubAbaConfig('conta')} className={`w-full text-left px-3 py-2 rounded-md text-xs font-medium ${subAbaConfig === 'conta' ? 'bg-[#202020] text-white' : 'text-zinc-400 hover:text-white'}`}>
+                  Minha Conta & Sessão
+                </button>
+                {isSuperAdmin && (
+                  <button onClick={() => { setSubAbaConfig('empresas'); fetchCompanies(); }} className={`w-full text-left px-3 py-2 rounded-md text-xs font-bold flex items-center gap-2 ${subAbaConfig === 'empresas' ? 'bg-blue-950/40 text-blue-400 border border-blue-900/50' : 'text-blue-400/70 hover:text-blue-300'}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>
+                    Gestão de Cozinhas (B2B)
+                  </button>
+                )}
+              </nav>
+            </aside>
+          )}
+
+          {/* CONTEÚDO PRINCIPAL */}
           <main className="flex-1 bg-[#0f0f0f] p-6 md:p-10 overflow-y-auto">
-            
-            {/* NOVO: RENDERIZA O COMPONENTE EXTERNO DE FECHAMENTO */}
-            {abaAtiva === 'fechamento' && FechamentoComponent && (
-              <FechamentoComponent 
-                lancamentos={lancamentos} 
-                produtos={produtos} 
-                supabaseClient={supabaseClient} 
-                companyId={effectiveCompanyId || 'cozinha-brasileira'} 
-                onConcluido={() => carregarDadosOperacionais(effectiveCompanyId || 'cozinha-brasileira')}
-              />
-            )}
-            
-            {!FechamentoComponent && abaAtiva === 'fechamento' && (
-              <div className="text-white text-sm">Carregando módulo de fechamento... (Verifique se o arquivo Fechamento.js foi salvo no GitHub)</div>
+
+            {impersonatedCompany && (
+              <div className="mb-6 p-3 bg-amber-500/15 border border-amber-500/40 rounded-xl flex items-center justify-between text-xs text-amber-300">
+                <span><strong>[Modo Suporte Ativo]:</strong> Conectado em: <strong>{impersonatedCompany.company_name}</strong></span>
+                <button onClick={() => { setImpersonatedCompany(null); setAbaAtiva('configuracoes'); setSubAbaConfig('empresas'); }} className="bg-amber-500 hover:bg-amber-400 text-black font-bold px-3 py-1.5 rounded-lg text-xs shadow-md">
+                  Voltar ao Painel Master
+                </button>
+              </div>
             )}
 
-            {/* ABA PAINEL E DEMAIS (MANTIDAS EXATAMENTE COMO NO SEU ÚLTIMO PEDIDO) */}
-            {abaAtiva === 'painel' && (
-               <div className="max-w-6xl">
-                 <header className="mb-8">
-                   <h1 className="text-2xl font-bold tracking-tight text-white">Painel Gerencial</h1>
-                 </header>
-                 {/* ... cards e tabela de últimos lançamentos ... */}
-                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {isSuperAdmin && !impersonatedCompany && abaAtiva !== 'configuracoes' && (
+              <div className="max-w-xl bg-[#161616] p-8 rounded-xl border border-[#2d2d2d] text-center mx-auto mt-10">
+                <h2 className="text-xl font-bold text-white mb-2">Painel Global FoodStrick Master</h2>
+                <p className="text-zinc-400 text-sm mb-6">Aceda à secção de Configurações para gerir as cozinhas e estabelecimentos registados.</p>
+                <button onClick={() => { setAbaAtiva('configuracoes'); setSubAbaConfig('empresas'); }} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-lg text-sm">
+                  Abrir Gestão B2B
+                </button>
+              </div>
+            )}
+
+            {/* 1. ABA PAINEL GERAL */}
+            {abaAtiva === 'painel' && (!isSuperAdmin || impersonatedCompany) && (
+              <div className="max-w-6xl">
+                <header className="mb-8">
+                  <h1 className="text-2xl font-bold tracking-tight text-white">Painel Gerencial</h1>
+                  <p className="text-xs text-zinc-400">Visão consolidada de vendas, margens e despesas</p>
+                </header>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                   <div className="bg-[#161616] border border-[#262626] p-5 rounded-xl">
                     <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Faturamento</span>
                     <p className="text-2xl font-bold text-white mt-1">R$ {faturamento.toFixed(2)}</p>
@@ -465,9 +1016,566 @@
                     <p className={`text-2xl font-bold mt-1 ${resultadoMes >= 0 ? 'text-[#D95B1E]' : 'text-red-500'}`}>R$ {resultadoMes.toFixed(2)}</p>
                   </div>
                 </div>
-               </div>
+
+                <div className="bg-[#161616] border border-[#262626] rounded-xl p-5 overflow-x-auto shadow-sm">
+                  <h2 className="text-sm font-bold text-white mb-4">Últimos Lançamentos</h2>
+                  <table className="w-full text-left text-xs text-zinc-400">
+                    <thead className="border-b border-[#262626]">
+                      <tr>
+                        <th className="pb-3 uppercase">Data</th>
+                        <th className="pb-3 uppercase">Tipo</th>
+                        <th className="pb-3 uppercase">Descrição</th>
+                        <th className="pb-3 uppercase text-center">Qtd</th>
+                        <th className="pb-3 uppercase">Canal</th>
+                        <th className="pb-3 uppercase text-right">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#262626]">
+                      {lancamentosAtivos.slice(0, 10).map(l => (
+                        <tr key={l.id} className="hover:bg-[#1c1c1c]">
+                          <td className="py-3">{l.data}</td>
+                          <td className="py-3"><span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${l.tipo === 'Venda' ? 'bg-emerald-950/60 text-emerald-400' : 'bg-red-950/60 text-red-400'}`}>{l.tipo}</span></td>
+                          <td className="py-3 text-white font-medium">{l.descricao}{l.fornecedor && <span className="text-[10px] text-zinc-500 block">Forn: {l.fornecedor}</span>}</td>
+                          <td className="py-3 text-center text-white">{l.quantidade || '-'}</td>
+                          <td className="py-3">{l.canal_categoria}</td>
+                          <td className="py-3 text-right font-bold text-white">R$ {Number(l.valor_total).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
-            {/* O restante do código (Lançamentos, Produtos, Configurações) permanece intacto conforme combinado */}
+
+            {/* 2. ABA LANÇAMENTOS */}
+            {abaAtiva === 'lancamentos' && (!isSuperAdmin || impersonatedCompany) && (
+              <div className="max-w-6xl">
+                <header className="mb-6"><h1 className="text-2xl font-bold text-white">Novo Lançamento</h1></header>
+                <form onSubmit={handleSalvarLancamento} className="bg-[#161616] border border-[#262626] p-6 rounded-xl mb-8 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Operação</label>
+                      <select value={novoLancamento.tipo} onChange={e => setNovoLancamento({...novoLancamento, tipo: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none">
+                        <option>Venda</option><option>Despesa</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Data</label>
+                      <input type="date" value={novoLancamento.data} onChange={e => setNovoLancamento({...novoLancamento, data: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none" required />
+                    </div>
+                    {novoLancamento.tipo === 'Venda' ? (
+                      <div className="col-span-2">
+                        <label className="block text-xs font-medium text-zinc-400 mb-1">Produto</label>
+                        <select value={novoLancamento.produto_id} onChange={e => setNovoLancamento({...novoLancamento, produto_id: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none" required>
+                          <option value="">Selecione o produto...</option>
+                          {produtos.map(p => <option key={p.id} value={p.id}>{p.nome} (R$ {Number(p.preco_venda).toFixed(2)})</option>)}
+                        </select>
+                      </div>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="block text-xs font-medium text-zinc-400 mb-1">Descrição</label>
+                          <input type="text" placeholder="Ex: Insumos, contas..." value={novoLancamento.descricao} onChange={e => setNovoLancamento({...novoLancamento, descricao: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none" required />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-zinc-400 mb-1">Fornecedor (Opcional)</label>
+                          <input type="text" value={novoLancamento.fornecedor} onChange={e => setNovoLancamento({...novoLancamento, fornecedor: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none" />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {novoLancamento.tipo === 'Venda' ? (
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1">Quantidade</label>
+                        <input type="number" min="1" value={novoLancamento.quantidade} onChange={e => setNovoLancamento({...novoLancamento, quantidade: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none" required />
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1">Valor (R$)</label>
+                        <input type="number" step="0.01" value={novoLancamento.valor_despesa} onChange={e => setNovoLancamento({...novoLancamento, valor_despesa: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none" required />
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Forma de Pagamento</label>
+                      <select value={novoLancamento.pagamento} onChange={e => setNovoLancamento({...novoLancamento, pagamento: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none">
+                        <option>Pix</option><option>Cartão</option><option>Dinheiro</option><option>Transferência</option><option>Outro</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Canal / Categoria</label>
+                      <select value={novoLancamento.canal_categoria} onChange={e => setNovoLancamento({...novoLancamento, canal_categoria: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none">
+                        <option>Delivery</option><option>Retirada</option><option>Evento</option><option>Insumos</option><option>Embalagens</option><option>Bebidas</option><option>Outros</option>
+                      </select>
+                    </div>
+                    <div className="flex items-end">
+                      <button type="submit" className="w-full btn-orange font-bold py-2.5 rounded-lg text-xs transition-all shadow-md">Registar Operação</button>
+                    </div>
+                  </div>
+                </form>
+
+                <div className="bg-[#161616] border border-[#262626] rounded-xl p-5 overflow-x-auto shadow-sm">
+                  <h2 className="text-sm font-bold text-white mb-4">Histórico Completo</h2>
+                  <table className="w-full text-left text-xs text-zinc-400">
+                    <thead className="border-b border-[#262626]">
+                      <tr>
+                        <th className="pb-3 uppercase">Data</th>
+                        <th className="pb-3 uppercase">Tipo</th>
+                        <th className="pb-3 uppercase">Descrição</th>
+                        <th className="pb-3 uppercase text-center">Qtd</th>
+                        <th className="pb-3 uppercase">Canal</th>
+                        <th className="pb-3 uppercase text-right">Valor</th>
+                        <th className="pb-3 uppercase text-center"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#262626]">
+                      {lancamentosAtivos.map(l => (
+                        <tr key={l.id} className="hover:bg-[#1c1c1c] group">
+                          <td className="py-3">{l.data}</td>
+                          <td className="py-3"><span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${l.tipo === 'Venda' ? 'bg-emerald-950/60 text-emerald-400' : 'bg-red-950/60 text-red-400'}`}>{l.tipo}</span></td>
+                          <td className="py-3 text-white font-medium">{l.descricao}{l.fornecedor && <span className="text-[10px] text-zinc-500 block">Forn: {l.fornecedor}</span>}</td>
+                          <td className="py-3 text-center text-white">{l.quantidade || '-'}</td>
+                          <td className="py-3">{l.canal_categoria}</td>
+                          <td className="py-3 text-right font-bold text-white">R$ {Number(l.valor_total).toFixed(2)}</td>
+                          <td className="py-3 text-center">
+                            <button 
+                              onClick={() => setModalExclusao({ aberto: true, idLancamento: l.id })} 
+                              className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors" 
+                              title="Excluir Lançamento"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 3. ABA PRODUTOS & CARDÁPIO */}
+            {abaAtiva === 'produtos' && (!isSuperAdmin || impersonatedCompany) && (
+              <div className="max-w-6xl">
+                <header className="mb-6"><h1 className="text-2xl font-bold text-white">Produtos & Cardápio</h1></header>
+                <form onSubmit={handleSalvarProduto} className="bg-[#161616] border border-[#262626] p-6 rounded-xl mb-8 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Nome do Item</label>
+                      <input type="text" value={novoProduto.nome} onChange={e => setNovoProduto({...novoProduto, nome: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Preço Venda (R$)</label>
+                      <input type="number" step="0.01" value={novoProduto.preco_venda} onChange={e => setNovoProduto({...novoProduto, preco_venda: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Custo Insumo (R$)</label>
+                      <input type="number" step="0.01" value={novoProduto.custo_unitario} onChange={e => setNovoProduto({...novoProduto, custo_unitario: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none" required />
+                    </div>
+                    <div className="flex items-end">
+                      <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-lg text-xs transition-all shadow-md">Guardar Produto</button>
+                    </div>
+                  </div>
+                </form>
+
+                <div className="bg-[#161616] border border-[#262626] rounded-xl p-5 overflow-x-auto shadow-sm">
+                  <h2 className="text-sm font-bold text-white mb-4">Itens Registados ({produtos.length})</h2>
+                  <table className="w-full text-left text-xs text-zinc-400">
+                    <thead className="border-b border-[#262626]">
+                      <tr>
+                        <th className="pb-3 uppercase">Item</th>
+                        <th className="pb-3 uppercase">Preço Venda</th>
+                        <th className="pb-3 uppercase">Custo</th>
+                        <th className="pb-3 uppercase">Margem Bruta</th>
+                        <th className="pb-3 uppercase">Margem (%)</th>
+                        <th className="pb-3 uppercase text-right pr-4">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#262626]">
+                      {produtos.map(p => {
+                        const margem = Number(p.preco_venda) - Number(p.custo_unitario);
+                        const pct = p.preco_venda > 0 ? ((margem / p.preco_venda) * 100).toFixed(1) : 0;
+                        const totalIng = Array.isArray(p.ingredientes) ? p.ingredientes.length : 0;
+                        return (
+                          <tr key={p.id} className="hover:bg-[#1c1c1c] group">
+                            <td className="py-3 text-white font-medium">
+                              {p.nome}
+                              {totalIng > 0 && (
+                                <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-900/60">
+                                  {totalIng} insumos
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 text-white">R$ {Number(p.preco_venda).toFixed(2)}</td>
+                            <td className="py-3">R$ {Number(p.custo_unitario).toFixed(2)}</td>
+                            <td className="py-3 font-bold text-emerald-400">R$ {margem.toFixed(2)}</td>
+                            <td className="py-3 text-zinc-300">{pct}%</td>
+                            <td className="py-3 text-right pr-4">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button 
+                                  onClick={() => setModalFichaTecnica({ aberto: true, produto: p })}
+                                  className="p-1.5 text-zinc-400 hover:text-emerald-400 hover:bg-emerald-400/10 rounded transition-colors"
+                                  title="Ver / Adicionar Ingredientes e Ficha Técnica"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
+                                </button>
+                                <button 
+                                  onClick={() => setModalEditarProduto({
+                                    aberto: true,
+                                    id: p.id,
+                                    nome: p.nome,
+                                    preco_venda: p.preco_venda,
+                                    custo_unitario: p.custo_unitario,
+                                    observacao: p.observacao || ''
+                                  })} 
+                                  className="p-1.5 text-zinc-400 hover:text-amber-400 hover:bg-amber-400/10 rounded transition-colors"
+                                  title="Editar Produto e Preço"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                                </button>
+                                <button 
+                                  onClick={() => setModalExcluirProduto({ aberto: true, idProduto: p.id, nome: p.nome })} 
+                                  className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
+                                  title="Eliminar Produto"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 4. ABA FICHAS TÉCNICAS */}
+            {abaAtiva === 'fichas' && (!isSuperAdmin || impersonatedCompany) && (
+              <div className="max-w-6xl">
+                <header className="mb-6">
+                  <h1 className="text-2xl font-bold text-white">Central de Fichas Técnicas</h1>
+                  <p className="text-xs text-zinc-400">Controlo minucioso de cada insumo, pesagem e custo real por porção</p>
+                </header>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {produtos.map(p => {
+                    const ingList = Array.isArray(p.ingredientes) ? p.ingredientes : [];
+                    const somaCusto = ingList.reduce((acc, curr) => acc + Number(curr.custo || 0), 0);
+                    const custoFinal = ingList.length > 0 ? somaCusto : Number(p.custo_unitario || 0);
+                    const preco = Number(p.preco_venda || 0);
+                    const margem = preco - custoFinal;
+
+                    return (
+                      <div key={p.id} className="bg-[#161616] border border-[#262626] rounded-xl p-5 flex flex-col justify-between hover:border-zinc-700 transition-colors">
+                        <div>
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <h3 className="text-base font-bold text-white">{p.nome}</h3>
+                              <span className="text-[11px] text-zinc-500">{ingList.length} ingredientes na ficha</span>
+                            </div>
+                            <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-900/60">
+                              R$ {custoFinal.toFixed(2)}
+                            </span>
+                          </div>
+
+                          <div className="bg-[#1f1f1f] rounded-lg p-3 my-3 space-y-1.5 text-xs text-zinc-300">
+                            {ingList.length === 0 ? (
+                              <p className="text-zinc-500 italic text-[11px]">Nenhum ingrediente adicionado ainda.</p>
+                            ) : (
+                              ingList.slice(0, 3).map((item, idx) => (
+                                <div key={idx} className="flex justify-between text-[11px]">
+                                  <span className="text-zinc-400 truncate max-w-[140px]">{item.nome} ({item.quantidade})</span>
+                                  <span className="text-white font-mono">R$ {Number(item.custo).toFixed(2)}</span>
+                                </div>
+                              ))
+                            )}
+                            {ingList.length > 3 && (
+                              <p className="text-[10px] text-zinc-500 pt-1">+ {ingList.length - 3} outros insumos...</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="pt-3 border-t border-[#262626] flex items-center justify-between">
+                          <div className="text-[11px]">
+                            <span className="text-zinc-500 block">Venda: R$ {preco.toFixed(2)}</span>
+                            <span className="text-emerald-400 font-semibold block">Margem: R$ {margem.toFixed(2)}</span>
+                          </div>
+
+                          <button
+                            onClick={() => setModalFichaTecnica({ aberto: true, produto: p })}
+                            className="bg-emerald-950/60 hover:bg-emerald-900 text-emerald-400 border border-emerald-800/60 font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-colors"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
+                            Abrir Ficha
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 5. ABA FECHAMENTO MENSAL */}
+            {abaAtiva === 'fechamento' && (!isSuperAdmin || impersonatedCompany) && (
+              <div className="max-w-6xl">
+                <header className="mb-6">
+                  <h1 className="text-2xl font-bold text-white">Fechamento do Mês & Extrato</h1>
+                  <p className="text-xs text-zinc-400">Consolidação de receitas, despesas, consumo de insumos e reinício de ciclo</p>
+                </header>
+
+                <div className="bg-[#161616] border border-[#D95B1E]/40 rounded-2xl p-6 mb-8 shadow-xl">
+                  <div className="flex items-center justify-between pb-4 mb-5 border-b border-[#262626]">
+                    <div>
+                      <h2 className="text-base font-bold text-white flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D95B1E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                        Resumo do Ciclo Atual
+                      </h2>
+                      <span className="text-xs text-zinc-400">Lançamentos acumulados até ao momento</span>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-[#D95B1E] bg-[#D95B1E]/10 border border-[#D95B1E]/30 px-3 py-1 rounded-lg">
+                      {lancamentosAtivos.length} registos ativos
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-[#1f1f1f] p-4 rounded-xl border border-[#2d2d2d]">
+                      <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Faturação Bruta</span>
+                      <span className="text-lg font-bold text-white">R$ {faturamento.toFixed(2)}</span>
+                    </div>
+                    <div className="bg-[#1f1f1f] p-4 rounded-xl border border-[#2d2d2d]">
+                      <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Total Despesas</span>
+                      <span className="text-lg font-bold text-red-400">R$ {totalDespesas.toFixed(2)}</span>
+                    </div>
+                    <div className="bg-[#1f1f1f] p-4 rounded-xl border border-[#2d2d2d]">
+                      <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Lucro Apurado</span>
+                      <span className="text-lg font-bold text-emerald-400">R$ {resultadoMes.toFixed(2)}</span>
+                    </div>
+                    <div className="bg-[#1f1f1f] p-4 rounded-xl border border-[#2d2d2d]">
+                      <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Volume de Vendas</span>
+                      <span className="text-sm font-bold text-zinc-200 mt-1 block">{totalPratos} Pratos | {totalBebidas} Bebidas</span>
+                    </div>
+                  </div>
+
+                  {/* Consumo de Ingredientes */}
+                  <div className="mb-6">
+                    <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Estimativa de Insumos e Ingredientes Gastos</h3>
+                    <div className="bg-[#1c1c1c] border border-[#262626] rounded-xl p-4 max-h-48 overflow-y-auto">
+                      {arrayIngredientes.length === 0 ? (
+                        <p className="text-xs text-zinc-500 italic">Nenhum consumo de ingrediente calculado (adicione insumos às Fichas Técnicas dos produtos vendidos).</p>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
+                          {arrayIngredientes.map(([nome, dados], idx) => (
+                            <div key={idx} className="flex justify-between items-center text-xs border-b border-[#242424] pb-1.5">
+                              <span className="text-zinc-300 font-medium">{nome}</span>
+                              <span className="font-mono text-emerald-400">
+                                {dados.qtd} {dados.unidade} 
+                                <span className="text-zinc-500 ml-1.5">(R$ {dados.custoTotal.toFixed(2)})</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      onClick={handleExecutarFechamento}
+                      disabled={processandoFechamento || lancamentosAtivos.length === 0}
+                      className="bg-[#D95B1E] hover:bg-[#c34e17] disabled:opacity-50 text-white font-bold py-3 px-6 rounded-xl text-xs transition-all shadow-lg flex items-center gap-2"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
+                      {processandoFechamento ? 'A processar fechamento...' : 'Encerrar Mês & Arquivar Lançamentos'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Histórico dos Meses Anteriores */}
+                <div>
+                  <h2 className="text-base font-bold text-white mb-4">Extratos de Meses Anteriores</h2>
+                  {historicoFechamentos.length === 0 ? (
+                    <div className="bg-[#161616] border border-[#262626] rounded-xl p-8 text-center text-zinc-500 text-xs italic">
+                      Nenhum fechamento realizado até ao momento. Ao encerrar o mês, o extrato fica gravado aqui.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {historicoFechamentos.map(fech => (
+                        <div key={fech.id} className="bg-[#161616] border border-[#262626] rounded-xl p-5 hover:border-zinc-600 transition-colors">
+                          <div className="flex justify-between items-center pb-3 border-b border-[#262626] mb-3">
+                            <h3 className="font-bold text-white text-sm">Competência: {fech.mes_ano}</h3>
+                            <span className="text-[11px] text-zinc-500">{new Date(fech.data_fechamento).toLocaleDateString()}</span>
+                          </div>
+                          <div className="space-y-1.5 text-xs">
+                            <div className="flex justify-between"><span className="text-zinc-400">Faturação:</span><span className="text-white font-mono font-bold">R$ {Number(fech.relatorio.faturamento).toFixed(2)}</span></div>
+                            <div className="flex justify-between"><span className="text-zinc-400">Despesas:</span><span className="text-red-400 font-mono">R$ {Number(fech.relatorio.despesas).toFixed(2)}</span></div>
+                            <div className="flex justify-between border-t border-[#262626] pt-1.5 font-bold"><span className="text-zinc-300">Lucro Líquido:</span><span className="text-emerald-400 font-mono">R$ {Number(fech.relatorio.lucro).toFixed(2)}</span></div>
+                            <div className="text-[11px] text-zinc-500 pt-1">Volume: {fech.relatorio.totalPratos || 0} pratos, {fech.relatorio.totalBebidas || 0} bebidas ({fech.relatorio.totalRegistros || 0} registos)</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 6. CONFIGURAÇÕES & ADMINISTRAÇÃO B2B */}
+            {abaAtiva === 'configuracoes' && (
+              <div className="max-w-6xl">
+                {subAbaConfig === 'exclusoes' && (!isSuperAdmin || impersonatedCompany) && (
+                  <div>
+                    <h1 className="text-2xl font-bold text-white mb-1">Lixeira de Exclusões</h1>
+                    <p className="text-xs text-zinc-400 mb-6">Registo detalhado de operações canceladas no caixa.</p>
+                    <div className="bg-[#161616] border border-[#262626] rounded-xl p-5 overflow-x-auto">
+                      {lancamentosExcluidos.length === 0 ? <p className="text-zinc-500 text-xs italic">Nenhum registo cancelado.</p> : (
+                        <table className="w-full text-left text-xs text-zinc-400">
+                          <thead className="border-b border-[#262626]">
+                            <tr><th className="pb-3 uppercase">Data</th><th className="pb-3 uppercase">Descrição</th><th className="pb-3 uppercase text-right">Valor</th><th className="pb-3 uppercase text-red-400 pl-4">Motivo</th></tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#262626]">
+                            {lancamentosExcluidos.map(l => (
+                              <tr key={l.id} className="hover:bg-[#1c1c1c]">
+                                <td className="py-3">{l.data}</td>
+                                <td className="py-3 text-zinc-400 line-through">{l.descricao}</td>
+                                <td className="py-3 text-right text-zinc-400 line-through">R$ {Number(l.valor_total).toFixed(2)}</td>
+                                <td className="py-3 text-red-400 font-bold pl-4">{l.motivo_exclusao}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {subAbaConfig === 'empresas' && isSuperAdmin && (
+                  <div>
+                    <h1 className="text-2xl font-bold text-white mb-6">Gestão de Cozinhas & Clientes (B2B)</h1>
+                    <form onSubmit={handleCreateCompanyB2B} className="bg-[#161616] border border-[#262626] p-6 rounded-xl mb-8 space-y-4">
+                      <h2 className="text-xs font-bold text-blue-400 uppercase tracking-wider">Registar Nova Cozinha / Cliente</h2>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <input type="text" placeholder="Nome do Cliente (Ex: Lanchonete X)" value={newCompanyName} onChange={e => setNewCompanyName(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none" required />
+                        <input type="text" placeholder="ID Interno (Ex: lanchonete-x)" value={newCompanySlug} onChange={e => setNewCompanySlug(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none" />
+                        <input type="text" placeholder="WhatsApp / Telefone" value={newCompanyPhone} onChange={e => setNewCompanyPhone(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none" />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input type="text" placeholder="Login do Cliente" value={newCompanyAdminUser} onChange={e => setNewCompanyAdminUser(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none" required />
+                        <input type="password" placeholder="Palavra-passe Inicial (min. 4 dígitos)" value={newCompanyAdminPass} onChange={e => setNewCompanyAdminPass(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none" required />
+                      </div>
+                      <div className="text-right">
+                        <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2 rounded-lg text-xs">Ativar Cozinha</button>
+                      </div>
+                    </form>
+
+                    <div className="bg-[#161616] border border-[#262626] rounded-xl p-5">
+                      <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4">Cozinhas Registadas ({companiesList.length})</h2>
+                      <div className="space-y-2">
+                        {companiesList.map(comp => (
+                          <div key={comp.id} className="bg-[#202020] p-3.5 rounded-lg border border-[#2d2d2d] flex justify-between items-center">
+                            <div>
+                              <p className="text-sm font-bold text-white flex items-center gap-2">{comp.company_name} <span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase ${comp.status === 'ativo' ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}`}>{comp.status}</span></p>
+                              <p className="text-[11px] text-zinc-500 font-mono mt-0.5">ID: {comp.company_id}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => { setImpersonatedCompany(comp); setAbaAtiva('painel'); }} className="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5">
+                                Aceder ao Painel 
+                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+                              </button>
+                              <button onClick={() => handleToggleCompanyStatus(comp.id, comp.status)} className="bg-zinc-800 text-zinc-300 px-3 py-1.5 rounded-lg text-xs font-medium">{comp.status === 'ativo' ? 'Suspender' : 'Reativar'}</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* SUB-ABA: CONTA & SESSÃO COM FOTO DE PERFIL EXPANDIDA */}
+                {subAbaConfig === 'conta' && (
+                  <div className="bg-[#161616] border border-[#262626] p-8 rounded-2xl w-full">
+                    <div className="flex flex-col lg:flex-row gap-10">
+                      
+                      {/* Coluna Esquerda: Foto de Perfil */}
+                      <div className="flex flex-col items-center shrink-0">
+                        <div className="relative group mb-4">
+                          <div className="w-32 h-32 rounded-full overflow-hidden bg-[#111111] border-2 border-[#D95B1E] shadow-xl flex items-center justify-center">
+                            {currentUser?.avatar_url ? (
+                              <img src={currentUser.avatar_url} alt="Perfil" className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-5xl font-black text-[#D95B1E] uppercase">
+                                {currentUser?.username ? currentUser.username.charAt(0) : '?'}
+                              </span>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={() => avatarInputRef.current?.click()}
+                            className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-semibold cursor-pointer"
+                            title="Alterar foto de perfil"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-1"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                            Mudar Foto
+                          </button>
+                          <input type="file" accept="image/*" ref={avatarInputRef} onChange={handleAvatarUpload} className="hidden" />
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => avatarInputRef.current?.click()} className="text-xs text-[#D95B1E] hover:text-[#c34e17] font-semibold transition-colors">
+                            {currentUser?.avatar_url ? 'Alterar foto' : 'Adicionar foto'}
+                          </button>
+                          {currentUser?.avatar_url && (
+                            <button onClick={handleRemoveAvatar} className="text-xs text-zinc-500 hover:text-red-400 font-medium transition-colors">
+                              Remover
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Coluna Direita: Informações Expandidas */}
+                      <div className="flex-1 w-full border-t lg:border-t-0 lg:border-l border-[#262626] pt-6 lg:pt-0 lg:pl-10">
+                        <h1 className="text-2xl font-bold text-white mb-2">Informações da Sessão</h1>
+                        <p className="text-xs text-zinc-400 mb-8">Gestão das credenciais ativas e permissões operacionais do sistema.</p>
+
+                        <div className="space-y-5">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="bg-[#1f1f1f] border border-[#2d2d2d] rounded-xl p-4">
+                              <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Utilizador Conectado</span>
+                              <span className="font-bold text-white text-base">{currentUser?.username}</span>
+                            </div>
+                            
+                            <div className="bg-[#1f1f1f] border border-[#2d2d2d] rounded-xl p-4">
+                              <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Função Base</span>
+                              <span className="font-bold text-[#D95B1E] uppercase text-base">{currentUser?.role}</span>
+                            </div>
+                          </div>
+
+                          <div className="bg-[#1f1f1f] border border-[#2d2d2d] rounded-xl p-4">
+                            <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Unidade / Empresa Ativa</span>
+                            <div className="flex items-center gap-3 mt-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>
+                              <span className="font-bold text-white text-lg">{effectiveCompanyName}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="bg-emerald-950/20 border border-emerald-900/30 rounded-xl p-4 flex items-center justify-between">
+                            <div>
+                              <span className="text-emerald-400 font-bold text-sm block">Estado da Ligação</span>
+                              <span className="text-emerald-600/80 text-xs">Sessão Autenticada e Segura</span>
+                            </div>
+                            <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.7)] animate-pulse"></div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
           </main>
         </div>
       );
