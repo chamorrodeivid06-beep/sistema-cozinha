@@ -166,7 +166,7 @@ window.LiveCursorComponent = function LiveCursor({
         <span
           key={ripple.id}
           style={{ left: ripple.x - 18, top: ripple.y - 18 }}
-          className="absolute w-9 h-9 rounded-full border-2 border-amber-400 animate-ping opacity-90 pointer-events-none"
+          className="absolute w-9 h-9 rounded-full border-2 border-[#D95B1E] animate-ping opacity-90 pointer-events-none"
         />
       ))}
 
@@ -193,8 +193,8 @@ window.LiveCursorComponent = function LiveCursor({
         </svg>
 
         <div
-          className={`ml-3 -mt-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-black shadow-xl flex items-center gap-1.5 border border-black/30 ${
-            isSuperAdmin ? 'bg-[#D95B1E] text-white' : 'bg-emerald-400 text-black'
+          className={`ml-3 -mt-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white shadow-xl flex items-center gap-1.5 border border-black/30 ${
+            isSuperAdmin ? 'bg-[#D95B1E]' : 'bg-emerald-600'
           }`}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
@@ -204,3 +204,6 @@ window.LiveCursorComponent = function LiveCursor({
     </div>
   );
 };
+
+// Notifica a aplicação quando o ficheiro estiver pronto
+window.dispatchEvent(new Event('live-cursor-loaded'));
