@@ -39,7 +39,7 @@
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [currentUser, setCurrentUser] = useState(null);
 
-      // MODO SUPORTE B2B
+      // Modo Suporte B2B
       const [impersonatedCompany, setImpersonatedCompany] = useState(null);
 
       // Login
@@ -49,7 +49,7 @@
       const [authError, setAuthError] = useState('');
 
       // Navegação
-      const [abaAtiva, setAbaAtiva] = useState('painel'); 
+      const [abaAtiva, setAbaAtiva] = useState('painel'); // painel | lancamentos | produtos | fichas | configuracoes
       const [subAbaConfig, setSubAbaConfig] = useState('empresas'); 
 
       // Dados
@@ -64,12 +64,15 @@
       
       // Modal de Edição de Produto (Lápis)
       const [modalEditarProduto, setModalEditarProduto] = useState({
-        aberto: false,
-        id: null,
-        nome: '',
-        preco_venda: '',
-        custo_unitario: '',
-        observacao: ''
+        aberto: false, id: null, nome: '', preco_venda: '', custo_unitario: '', observacao: ''
+      });
+
+      // Modal de Ficha Técnica / Ingredientes
+      const [modalFichaTecnica, setModalFichaTecnica] = useState({
+        aberto: false, produto: null
+      });
+      const [novoInsumo, setNovoInsumo] = useState({
+        nome: '', quantidade: '', custo: ''
       });
 
       // Formulários Operacionais
@@ -95,7 +98,6 @@
       const effectiveCompanyId = impersonatedCompany ? impersonatedCompany.company_id : currentUser?.company_id;
       const effectiveCompanyName = impersonatedCompany ? impersonatedCompany.company_name : (currentUser?.unidade || 'FoodStrick');
 
-      // Restaurar sessão
       useEffect(() => {
         const saved = localStorage.getItem('foodstrick_master_session');
         if (saved) {
@@ -112,7 +114,6 @@
         }
       }, []);
 
-      // Carregar dados sempre que a unidade ativa mudar
       useEffect(() => {
         if (isAuthenticated && effectiveCompanyId && effectiveCompanyId !== 'foodstrick-master') {
           carregarDadosOperacionais(effectiveCompanyId);
@@ -165,7 +166,6 @@
         setAuthError('');
         const cleanUser = username.trim().toLowerCase();
 
-        // 1. SUPER ADMIN MESTRE
         if (cleanUser === 'admin' && (password === 'admin123' || password === '123')) {
           const superAdminObj = { username: 'Super Admin', role: 'superadmin', company_id: 'foodstrick-master', unidade: 'FoodStrick Master' };
           localStorage.setItem('foodstrick_master_session', JSON.stringify(superAdminObj));
@@ -177,7 +177,6 @@
           return;
         }
 
-        // 2. ACESSO COZINHA BRASILEIRA
         if (cleanUser === 'cozinha' && password === '123') {
           const legacyObj = { username: 'Admin Cozinha', role: 'admin', company_id: 'cozinha-brasileira', unidade: 'Cozinha Brasileira' };
           localStorage.setItem('foodstrick_master_session', JSON.stringify(legacyObj));
@@ -187,7 +186,6 @@
           return;
         }
 
-        // 3. OUTROS USUÁRIOS
         try {
           const { data: userData } = await supabaseClient
             .from('app_users')
@@ -295,7 +293,8 @@
           nome: novoProduto.nome,
           preco_venda: parseFloat(novoProduto.preco_venda), 
           custo_unitario: parseFloat(novoProduto.custo_unitario), 
-          observacao: novoProduto.observacao
+          observacao: novoProduto.observacao,
+          ingredientes: []
         };
         const { error } = await supabaseClient.from('produtos').insert([payload]);
         if (error) alert("Erro: " + error.message);
@@ -313,14 +312,9 @@
           observacao: modalEditarProduto.observacao
         };
 
-        const { error } = await supabaseClient
-          .from('produtos')
-          .update(payload)
-          .eq('id', modalEditarProduto.id);
-
-        if (error) {
-          alert("Erro ao atualizar produto: " + error.message);
-        } else {
+        const { error } = await supabaseClient.from('produtos').update(payload).eq('id', modalEditarProduto.id);
+        if (error) alert("Erro ao atualizar produto: " + error.message);
+        else {
           carregarDadosOperacionais(compTarget);
           setModalEditarProduto({ aberto: false, id: null, nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
         }
@@ -337,6 +331,69 @@
         const { error } = await supabaseClient.from('produtos').delete().eq('id', id);
         if (error) alert("Erro: " + error.message);
         else { carregarDadosOperacionais(compTarget); setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' }); }
+      }
+
+      // --- FICHA TÉCNICA (INGREDIENTES) ---
+      async function handleAdicionarInsumo(e) {
+        e.preventDefault();
+        if (!modalFichaTecnica.produto) return;
+        const prod = modalFichaTecnica.produto;
+        const listaAtual = Array.isArray(prod.ingredientes) ? prod.ingredientes : [];
+        
+        const item = {
+          id: Date.now().toString(),
+          nome: novoInsumo.nome.trim(),
+          quantidade: novoInsumo.quantidade.trim(),
+          custo: parseFloat(novoInsumo.custo) || 0
+        };
+
+        const novaLista = [...listaAtual, item];
+        const novoCustoTotal = novaLista.reduce((acc, curr) => acc + Number(curr.custo || 0), 0);
+
+        const { error } = await supabaseClient
+          .from('produtos')
+          .update({ 
+            ingredientes: novaLista,
+            custo_unitario: novoCustoTotal 
+          })
+          .eq('id', prod.id);
+
+        if (error) {
+          alert("Erro ao adicionar ingrediente: " + error.message);
+        } else {
+          const prodAtualizado = { ...prod, ingredientes: novaLista, custo_unitario: novoCustoTotal };
+          setModalFichaTecnica({ aberto: true, produto: prodAtualizado });
+          setNovoInsumo({ nome: '', quantidade: '', custo: '' });
+          carregarDadosOperacionais(effectiveCompanyId);
+        }
+      }
+
+      async function handleRemoverInsumo(insumoId) {
+        if (!modalFichaTecnica.produto) return;
+        const prod = modalFichaTecnica.produto;
+        const listaAtual = Array.isArray(prod.ingredientes) ? prod.ingredientes : [];
+        const novaLista = listaAtual.filter(i => i.id !== insumoId);
+        const novoCustoTotal = novaLista.reduce((acc, curr) => acc + Number(curr.custo || 0), 0);
+
+        const { error } = await supabaseClient
+          .from('produtos')
+          .update({ 
+            ingredientes: novaLista,
+            custo_unitario: novaLista.length > 0 ? novoCustoTotal : prod.custo_unitario 
+          })
+          .eq('id', prod.id);
+
+        if (error) {
+          alert("Erro ao remover ingrediente: " + error.message);
+        } else {
+          const prodAtualizado = { 
+            ...prod, 
+            ingredientes: novaLista, 
+            custo_unitario: novaLista.length > 0 ? novoCustoTotal : prod.custo_unitario 
+          };
+          setModalFichaTecnica({ aberto: true, produto: prodAtualizado });
+          carregarDadosOperacionais(effectiveCompanyId);
+        }
       }
 
       // GESTÃO B2B
@@ -438,6 +495,166 @@
                   <button onClick={() => setModalExclusao({ aberto: false, idLancamento: null })} className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white">Cancelar</button>
                   <button onClick={confirmarExclusao} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold">Confirmar</button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL DE FICHA TÉCNICA (INGREDIENTES DO PRATO) */}
+          {modalFichaTecnica.aberto && modalFichaTecnica.produto && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 overflow-y-auto">
+              <div className="bg-[#161616] border border-[#2d2d2d] rounded-2xl p-6 w-full max-w-2xl shadow-2xl my-8">
+                
+                {/* Cabeçalho */}
+                <div className="flex items-center justify-between pb-4 border-b border-[#262626] mb-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-950/60 border border-emerald-800/50 flex items-center justify-center text-emerald-400">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white">Ficha Técnica: {modalFichaTecnica.produto.nome}</h3>
+                      <p className="text-xs text-zinc-400">Composição de ingredientes, quantidades e custo individual</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setModalFichaTecnica({ aberto: false, produto: null })}
+                    className="p-1.5 text-zinc-400 hover:text-white rounded-lg transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                  </button>
+                </div>
+
+                {/* Resumo da Ficha Técnica */}
+                {(() => {
+                  const ingList = Array.isArray(modalFichaTecnica.produto.ingredientes) ? modalFichaTecnica.produto.ingredientes : [];
+                  const somaCusto = ingList.reduce((acc, curr) => acc + Number(curr.custo || 0), 0);
+                  const precoVenda = Number(modalFichaTecnica.produto.preco_venda || 0);
+                  const margemRs = precoVenda - (ingList.length > 0 ? somaCusto : Number(modalFichaTecnica.produto.custo_unitario || 0));
+                  const margemPct = precoVenda > 0 ? ((margemRs / precoVenda) * 100).toFixed(1) : 0;
+
+                  return (
+                    <div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                        <div className="bg-[#202020] border border-[#2d2d2d] p-3 rounded-xl">
+                          <span className="text-[10px] uppercase font-bold text-zinc-400 block tracking-wider">Total de Insumos</span>
+                          <span className="text-xl font-bold text-white mt-1 block">{ingList.length} itens</span>
+                        </div>
+                        <div className="bg-[#202020] border border-[#2d2d2d] p-3 rounded-xl">
+                          <span className="text-[10px] uppercase font-bold text-zinc-400 block tracking-wider">Custo dos Ingredientes</span>
+                          <span className="text-xl font-bold text-emerald-400 mt-1 block">R$ {somaCusto.toFixed(2)}</span>
+                        </div>
+                        <div className="bg-[#202020] border border-[#2d2d2d] p-3 rounded-xl">
+                          <span className="text-[10px] uppercase font-bold text-zinc-400 block tracking-wider">Margem Bruta</span>
+                          <span className="text-xl font-bold text-[#D95B1E] mt-1 block">R$ {margemRs.toFixed(2)} ({margemPct}%)</span>
+                        </div>
+                      </div>
+
+                      {/* Lista de Ingredientes Cadastrados */}
+                      <div className="bg-[#1c1c1c] border border-[#262626] rounded-xl overflow-hidden mb-6">
+                        <div className="px-4 py-3 border-b border-[#262626] flex items-center justify-between">
+                          <span className="text-xs font-bold text-white uppercase tracking-wider">Lista de Ingredientes</span>
+                          <span className="text-[11px] text-zinc-400">Custo Total: <strong className="text-emerald-400">R$ {somaCusto.toFixed(2)}</strong></span>
+                        </div>
+
+                        {ingList.length === 0 ? (
+                          <div className="p-8 text-center text-xs text-zinc-500 italic">
+                            Nenhum ingrediente adicionado à ficha técnica deste produto ainda. Adicione os insumos abaixo!
+                          </div>
+                        ) : (
+                          <div className="max-h-52 overflow-y-auto divide-y divide-[#262626]">
+                            {ingList.map((insumo, index) => (
+                              <div key={insumo.id || index} className="px-4 py-2.5 flex items-center justify-between hover:bg-[#222] transition-colors">
+                                <div className="flex items-center gap-3">
+                                  <span className="w-5 h-5 rounded-full bg-zinc-800 text-[10px] font-bold text-zinc-400 flex items-center justify-center">
+                                    {index + 1}
+                                  </span>
+                                  <div>
+                                    <span className="text-xs font-bold text-white block">{insumo.nome}</span>
+                                    <span className="text-[11px] text-zinc-400 font-medium">Qtd: {insumo.quantidade}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                  <span className="text-xs font-bold text-white font-mono">R$ {Number(insumo.custo).toFixed(2)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoverInsumo(insumo.id)}
+                                    className="p-1 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
+                                    title="Remover ingrediente"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Formulário para Adicionar Insumo */}
+                      <form onSubmit={handleAdicionarInsumo} className="bg-[#202020] border border-[#2d2d2d] p-4 rounded-xl space-y-3">
+                        <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                          Adicionar Ingrediente / Insumo
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-medium text-zinc-400 mb-1">Ingrediente</label>
+                            <input 
+                              type="text" 
+                              placeholder="Ex: Pão Brioche, Carne 150g..." 
+                              value={novoInsumo.nome} 
+                              onChange={(e) => setNovoInsumo({ ...novoInsumo, nome: e.target.value })} 
+                              className="w-full bg-[#161616] border border-[#333] rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500" 
+                              required 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-medium text-zinc-400 mb-1">Quantidade</label>
+                            <input 
+                              type="text" 
+                              placeholder="Ex: 1 un, 150g, 2 fatias..." 
+                              value={novoInsumo.quantidade} 
+                              onChange={(e) => setNovoInsumo({ ...novoInsumo, quantidade: e.target.value })} 
+                              className="w-full bg-[#161616] border border-[#333] rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500" 
+                              required 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-medium text-zinc-400 mb-1">Custo (R$)</label>
+                            <input 
+                              type="number" 
+                              step="0.01" 
+                              placeholder="0.00" 
+                              value={novoInsumo.custo} 
+                              onChange={(e) => setNovoInsumo({ ...novoInsumo, custo: e.target.value })} 
+                              className="w-full bg-[#161616] border border-[#333] rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500" 
+                              required 
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end pt-1">
+                          <button 
+                            type="submit" 
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-lg text-xs transition-all shadow-md flex items-center gap-1.5"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                            Adicionar à Ficha
+                          </button>
+                        </div>
+                      </form>
+
+                      <div className="flex justify-end pt-5">
+                        <button 
+                          type="button" 
+                          onClick={() => setModalFichaTecnica({ aberto: false, produto: null })} 
+                          className="px-5 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-semibold"
+                        >
+                          Concluir Ficha Técnica
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
               </div>
             </div>
           )}
@@ -563,6 +780,12 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
                     Produtos & Custos
                   </button>
+
+                  {/* NOVA PARTE MARCADA EM VERMELHO NO PRINT: ABA FICHAS TÉCNICAS */}
+                  <button onClick={() => setAbaAtiva('fichas')} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'fichas' ? 'btn-orange shadow-md' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
+                    Fichas Técnicas
+                  </button>
                 </nav>
               )}
             </div>
@@ -579,7 +802,7 @@
             </div>
           </aside>
 
-          {/* SUB-SIDEBAR (Estilo Supabase) */}
+          {/* SUB-SIDEBAR (Configurações) */}
           {abaAtiva === 'configuracoes' && (
             <aside className="w-full md:w-56 bg-[#111111] border-r border-[#242424] p-5 shrink-0 hidden md:block h-screen sticky top-0 overflow-y-auto z-10">
               <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4">Ajustes & Gestão</h3>
@@ -605,7 +828,6 @@
           {/* CONTEÚDO PRINCIPAL */}
           <main className="flex-1 bg-[#0f0f0f] p-6 md:p-10 overflow-y-auto">
 
-            {/* AVISO DO MODO SUPORTE */}
             {impersonatedCompany && (
               <div className="mb-6 p-3 bg-amber-500/15 border border-amber-500/40 rounded-xl flex items-center justify-between text-xs text-amber-300">
                 <span><strong>[Modo Suporte Ativo]:</strong> Conectado em: <strong>{impersonatedCompany.company_name}</strong></span>
@@ -830,15 +1052,33 @@
                       {produtos.map(p => {
                         const margem = Number(p.preco_venda) - Number(p.custo_unitario);
                         const pct = p.preco_venda > 0 ? ((margem / p.preco_venda) * 100).toFixed(1) : 0;
+                        const totalIng = Array.isArray(p.ingredientes) ? p.ingredientes.length : 0;
                         return (
                           <tr key={p.id} className="hover:bg-[#1c1c1c] group">
-                            <td className="py-3 text-white font-medium">{p.nome}</td>
+                            <td className="py-3 text-white font-medium">
+                              {p.nome}
+                              {totalIng > 0 && (
+                                <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-900/60">
+                                  {totalIng} insumos
+                                </span>
+                              )}
+                            </td>
                             <td className="py-3 text-white">R$ {Number(p.preco_venda).toFixed(2)}</td>
                             <td className="py-3">R$ {Number(p.custo_unitario).toFixed(2)}</td>
                             <td className="py-3 font-bold text-emerald-400">R$ {margem.toFixed(2)}</td>
                             <td className="py-3 text-zinc-300">{pct}%</td>
                             <td className="py-3 text-right pr-4">
-                              <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center justify-end gap-1.5">
+                                
+                                {/* BOTÃO NOVO: FICHA TÉCNICA (EXATAMENTE NO QUADRADO VERMELHO) */}
+                                <button 
+                                  onClick={() => setModalFichaTecnica({ aberto: true, produto: p })}
+                                  className="p-1.5 text-zinc-400 hover:text-emerald-400 hover:bg-emerald-400/10 rounded transition-colors"
+                                  title="Ver / Adicionar Ingredientes e Ficha Técnica"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
+                                </button>
+
                                 {/* BOTÃO DO LÁPIS (EDITAR PRODUTO) */}
                                 <button 
                                   onClick={() => setModalEditarProduto({
@@ -874,7 +1114,75 @@
               </div>
             )}
 
-            {/* 4. CONFIGURAÇÕES & ADMINISTRAÇÃO B2B */}
+            {/* 4. NOVA ABA: FICHAS TÉCNICAS (ÁREA MARCADA NO MENU LATERAL) */}
+            {abaAtiva === 'fichas' && (!isSuperAdmin || impersonatedCompany) && (
+              <div className="max-w-6xl">
+                <header className="mb-6">
+                  <h1 className="text-2xl font-bold text-white">Central de Fichas Técnicas</h1>
+                  <p className="text-xs text-zinc-400">Controle minucioso de cada insumo, pesagem e custo real por porção</p>
+                </header>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {produtos.map(p => {
+                    const ingList = Array.isArray(p.ingredientes) ? p.ingredientes : [];
+                    const somaCusto = ingList.reduce((acc, curr) => acc + Number(curr.custo || 0), 0);
+                    const custoFinal = ingList.length > 0 ? somaCusto : Number(p.custo_unitario || 0);
+                    const preco = Number(p.preco_venda || 0);
+                    const margem = preco - custoFinal;
+
+                    return (
+                      <div key={p.id} className="bg-[#161616] border border-[#262626] rounded-xl p-5 flex flex-col justify-between hover:border-zinc-700 transition-colors">
+                        <div>
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <h3 className="text-base font-bold text-white">{p.nome}</h3>
+                              <span className="text-[11px] text-zinc-500">{ingList.length} ingredientes na ficha</span>
+                            </div>
+                            <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-900/60">
+                              R$ {custoFinal.toFixed(2)}
+                            </span>
+                          </div>
+
+                          {/* Prévia dos Ingredientes */}
+                          <div className="bg-[#1f1f1f] rounded-lg p-3 my-3 space-y-1.5 text-xs text-zinc-300">
+                            {ingList.length === 0 ? (
+                              <p className="text-zinc-500 italic text-[11px]">Nenhum ingrediente adicionado ainda.</p>
+                            ) : (
+                              ingList.slice(0, 3).map((item, idx) => (
+                                <div key={idx} className="flex justify-between text-[11px]">
+                                  <span className="text-zinc-400 truncate max-w-[140px]">{item.nome} ({item.quantidade})</span>
+                                  <span className="text-white font-mono">R$ {Number(item.custo).toFixed(2)}</span>
+                                </div>
+                              ))
+                            )}
+                            {ingList.length > 3 && (
+                              <p className="text-[10px] text-zinc-500 pt-1">+ {ingList.length - 3} outros insumos...</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="pt-3 border-t border-[#262626] flex items-center justify-between">
+                          <div className="text-[11px]">
+                            <span className="text-zinc-500 block">Venda: R$ {preco.toFixed(2)}</span>
+                            <span className="text-emerald-400 font-semibold block">Margem: R$ {margem.toFixed(2)}</span>
+                          </div>
+
+                          <button
+                            onClick={() => setModalFichaTecnica({ aberto: true, produto: p })}
+                            className="bg-emerald-950/60 hover:bg-emerald-900 text-emerald-400 border border-emerald-800/60 font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-colors"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
+                            Abrir Ficha
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 5. CONFIGURAÇÕES & ADMINISTRAÇÃO B2B */}
             {abaAtiva === 'configuracoes' && (
               <div className="max-w-6xl">
                 {subAbaConfig === 'exclusoes' && (!isSuperAdmin || impersonatedCompany) && (
