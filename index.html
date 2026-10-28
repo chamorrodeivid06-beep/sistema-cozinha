@@ -8,7 +8,7 @@
   <!-- FAVICON OFICIAL FOODSTRICK -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%228%22%20fill%3D%22%23D95B1E%22/%3E%3Cg%20transform%3D%22translate%284%2C%204%29%22%3E%3Cpath%20d%3D%22M8.5%2014.5A2.5%202.5%200%200%200%2011%2012c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054%202-6%20.5%202.5%202%204.9%204%206.5%202%201.6%203%203.5%203%205.5a7%207%200%201%201-14%200c0-1.153.433-2.294%201-3a2.5%202.5%200%200%200%202.5%202.5z%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/g%3E%3C/svg%3E">
   
-  <!-- BIBLIOTECAS DE PRODUÇÃO (EXECUÇÃO OTIMIZADA) -->
+  <!-- BIBLIOTECAS DE PRODUÇÃO -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -187,6 +187,7 @@
         </div>
       );
     }
+
     // ==========================================
     // COMPONENTE: SUPPORT CHAT (CHAT EM TEMPO REAL)
     // ==========================================
@@ -384,6 +385,7 @@
       const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.username === 'admin';
       const effectiveCompanyId = impersonatedCompany ? impersonatedCompany.company_id : currentUser?.company_id;
       const effectiveCompanyName = impersonatedCompany ? impersonatedCompany.company_name : (currentUser?.unidade || 'FoodStrick');
+
       // Verificação em segundo plano da presença de suporte
       useEffect(() => {
         if (!isAuthenticated || !currentUser || isSuperAdmin) return;
@@ -411,8 +413,6 @@
           let queryProd = supabaseClient.from('produtos').select('*');
           let queryLanc = supabaseClient.from('lancamentos').select('*');
 
-          // A Cozinha Brasileira acede aos registos legados (company_id nulo)
-          // Qualquer outra empresa filtra unicamente o seu ID próprio
           if (compId === 'cozinha-brasileira') {
             queryProd = queryProd.or('company_id.eq.cozinha-brasileira,company_id.is.null');
             queryLanc = queryLanc.or('company_id.eq.cozinha-brasileira,company_id.is.null');
@@ -502,6 +502,8 @@
       const handleLogout = async () => {
         if (impersonatedCompany) await handleStopImpersonation();
         localStorage.removeItem('foodstrick_master_session');
+        localStorage.removeItem('cache_prods');
+        localStorage.removeItem('cache_lancs');
         setIsAuthenticated(false);
         setCurrentUser(null);
         setImpersonatedCompany(null);
@@ -530,6 +532,7 @@
         setAbaAtiva('configuracoes');
         setSubAbaConfig('empresas');
       };
+
       // Cálculos Financeiros
       const lancamentosAtivos = useMemo(() => lancamentos.filter(l => l.status === 'ativo' || l.status === null), [lancamentos]);
       const lancamentosExcluidos = useMemo(() => lancamentos.filter(l => l.status === 'excluido'), [lancamentos]);
@@ -641,7 +644,7 @@
         }
       }
 
-      // 1. EDIÇÃO DE PRODUTO (CORRIGIDA COM TRATAMENTO DE VÍRGULAS)
+      // 1. EDIÇÃO DE PRODUTO (CORRIGIDA)
       async function handleAtualizarProduto(e) {
         e.preventDefault();
         const compTarget = effectiveCompanyId || 'cozinha-brasileira';
@@ -659,7 +662,6 @@
         if (error) {
           alert("Erro ao atualizar produto: " + error.message);
         } else {
-          // Atualização imediata da interface
           setProdutos(prev => prev.map(p => p.id === modalEditarProduto.id ? { ...p, ...payload } : p));
           setModalEditarProduto({ aberto: false, id: null, nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
           carregarTudoEmParalelo(compTarget);
@@ -785,7 +787,7 @@
         await supabaseClient.from('companies').insert([{ company_id: cleanSlug, company_name: cleanName, contact_phone: newCompanyPhone.trim(), status: 'ativo' }]);
         await supabaseClient.from('app_users').insert([{ username: newCompanyAdminUser.trim().toLowerCase(), password: newCompanyAdminPass.trim(), role: 'admin', company_id: cleanSlug }]);
 
-        alert(`Restaurante "${cleanName}" registado!`);
+        alert(`Restaurante "${cleanName}" registrado!`);
         setNewCompanyName(''); setNewCompanySlug(''); setNewCompanyPhone(''); setNewCompanyAdminUser(''); setNewCompanyAdminPass('');
         fetchCompanies();
       };
@@ -835,7 +837,10 @@
         setAbaAtiva(aba);
         setMobileMenuOpen(false);
       };
-      // ECRÃ DE LOGIN
+
+      // ==========================
+      // TELA DE LOGIN
+      // ==========================
       if (!isAuthenticated) {
         return (
           <div className="min-h-screen w-full flex items-center justify-center md:justify-start p-4 sm:p-6 md:p-16 lg:p-24 relative bg-cover bg-center" style={{ backgroundImage: `url("${LOGIN_BG_IMAGE}")` }}>
@@ -853,11 +858,11 @@
               {authError && <div className="mb-4 p-3 bg-red-950/60 border border-red-800 text-red-300 rounded-lg text-xs font-medium text-center">{authError}</div>}
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">Utilizador</label>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">Usuário</label>
                   <input type="text" placeholder="admin ou cozinha" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full bg-[#202020] text-white text-base md:text-sm px-4 py-3 md:py-2.5 rounded-lg border border-[#333] focus:border-[#D95B1E] outline-none" required />
                 </div>
                 <div className="relative">
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">Palavra-passe</label>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">Senha</label>
                   <input type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-[#202020] text-white text-base md:text-sm px-4 py-3 md:py-2.5 pr-10 rounded-lg border border-[#333] focus:border-[#D95B1E] outline-none" required />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-8 md:top-8 text-zinc-400 hover:text-white p-1">
                     {showPassword ? (
@@ -867,7 +872,7 @@
                     )}
                   </button>
                 </div>
-                <button type="submit" className="w-full btn-orange font-bold py-3.5 md:py-3 rounded-lg text-sm tracking-wide shadow-lg transition-all mt-2 active:scale-95">Aceder ao Sistema</button>
+                <button type="submit" className="w-full btn-orange font-bold py-3.5 md:py-3 rounded-lg text-sm tracking-wide shadow-lg transition-all mt-2 active:scale-95">Acessar Sistema</button>
               </form>
             </div>
           </div>
@@ -1173,6 +1178,7 @@
               </button>
             </div>
           </aside>
+
           {/* SUB-SIDEBAR DESKTOP */}
           {abaAtiva === 'configuracoes' && (
             <aside className="w-56 bg-[#111111] border-r border-[#242424] p-5 shrink-0 hidden md:block h-screen sticky top-0 overflow-y-auto z-10">
@@ -1382,7 +1388,7 @@
               </div>
             )}
 
-            {/* 3. ABA PRODUTOS & CARDÁPIO COM OS 3 BOTÕES DE AÇÃO OPERACIONAIS */}
+            {/* 3. ABA PRODUTOS & CARDÁPIO */}
             {abaAtiva === 'produtos' && (!isSuperAdmin || impersonatedCompany) && (
               <div className="max-w-6xl">
                 <header className="mb-5"><h1 className="text-xl sm:text-2xl font-bold text-white">Produtos & Cardápio</h1></header>
