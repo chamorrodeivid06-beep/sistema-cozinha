@@ -103,8 +103,7 @@ window.SupportChatComponent = function SupportChat({
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
       {/* JANELA DE CONVERSA */}
       {isOpen && (
-        <div className="w-80 sm:w-96 h-[480px] bg-[#161616] border border-[#2d2d2d] rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
-          {/* Topo */}
+        <div className="w-80 sm:w-96 h-[480px] bg-[#161616] border border-[#2d2d2d] rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-3 animate-in fade-in duration-200">
           <div className="p-4 bg-[#111111] border-b border-[#262626] flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-full bg-[#D95B1E]/10 border border-[#D95B1E]/30 flex items-center justify-center text-[#D95B1E]">
@@ -129,7 +128,6 @@ window.SupportChatComponent = function SupportChat({
             </button>
           </div>
 
-          {/* Mensagens */}
           <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs">
             {messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center text-zinc-500 space-y-2">
@@ -166,7 +164,6 @@ window.SupportChatComponent = function SupportChat({
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input de envio */}
           <form onSubmit={handleSendMessage} className="p-3 bg-[#111111] border-t border-[#262626] flex items-center gap-2">
             <input
               type="text"
