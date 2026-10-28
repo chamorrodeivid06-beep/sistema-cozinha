@@ -8,7 +8,7 @@
   <!-- FAVICON OFICIAL FOODSTRICK -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%228%22%20fill%3D%22%23D95B1E%22/%3E%3Cg%20transform%3D%22translate%284%2C%204%29%22%3E%3Cpath%20d%3D%22M8.5%2014.5A2.5%202.5%200%200%200%2011%2012c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054%202-6%20.5%202.5%202%204.9%204%206.5%202%201.6%203%203.5%203%205.5a7%207%200%201%201-14%200c0-1.153.433-2.294%201-3a2.5%202.5%200%200%200%202.5%202.5z%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/g%3E%3C/svg%3E">
   
-  <!-- BIBLIOTECAS OTIMIZADAS -->
+  <!-- BIBLIOTECAS DE PRODUÇÃO (EXECUÇÃO OTIMIZADA) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -41,14 +41,14 @@
   </style>
 </head>
 <body>
-  <!-- TELA DE TRANSIÇÃO LIMPA (SUBSTITUÍDA ASSIM QUE O REACT INICIA) -->
+  <!-- TELA INICIAL INSTANTÂNEA -->
   <div id="root">
     <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f0f0f; color: #fff;">
       <div class="splash-pulse" style="width: 56px; height: 56px; border-radius: 16px; background-color: #D95B1E; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 25px rgba(217,91,30,0.35); margin-bottom: 16px;">
         <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
       </div>
       <h2 style="font-size: 16px; font-weight: 800; letter-spacing: 0.5px; margin: 0; color: #ffffff;">FoodStrick</h2>
-      <span style="font-size: 11px; color: #71717a; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px;">Iniciando sistema...</span>
+      <span style="font-size: 11px; color: #71717a; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px;">A carregar dados...</span>
     </div>
   </div>
 
@@ -187,7 +187,6 @@
         </div>
       );
     }
-
     // ==========================================
     // COMPONENTE: SUPPORT CHAT (CHAT EM TEMPO REAL)
     // ==========================================
@@ -201,7 +200,12 @@
       const fetchMessages = async () => {
         if (!companyId || !operatorUsername || !supabaseClient) return;
         try {
-          const { data } = await supabaseClient.from('support_messages').select('*').eq('company_id', companyId).eq('operator_username', operatorUsername).order('created_at', { ascending: true });
+          const { data } = await supabaseClient
+            .from('support_messages')
+            .select('*')
+            .eq('company_id', companyId)
+            .eq('operator_username', operatorUsername)
+            .order('created_at', { ascending: true });
           if (data) setMessages(data);
         } catch (err) {}
       };
@@ -233,7 +237,13 @@
         if (!text) return;
         setNewMessage('');
         try {
-          await supabaseClient.from('support_messages').insert([{ company_id: companyId, operator_username: operatorUsername, sender_username: currentUsername, sender_role: currentUserRole || 'operador', message: text }]);
+          await supabaseClient.from('support_messages').insert([{
+            company_id: companyId,
+            operator_username: operatorUsername,
+            sender_username: currentUsername,
+            sender_role: currentUserRole || 'operador',
+            message: text
+          }]);
         } catch (err) {}
       };
 
@@ -303,13 +313,14 @@
     // APLICAÇÃO PRINCIPAL (APP)
     // ==========================================
     function App() {
-      const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(localStorage.getItem('foodstrick_master_session')));
       const [currentUser, setCurrentUser] = useState(() => {
         try {
           const s = localStorage.getItem('foodstrick_master_session');
           return s ? JSON.parse(s) : null;
         } catch(e) { return null; }
       });
+
+      const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(currentUser));
 
       const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
       const [impersonatedCompany, setImpersonatedCompany] = useState(null);
@@ -323,17 +334,21 @@
       const [abaAtiva, setAbaAtiva] = useState('painel'); 
       const [subAbaConfig, setSubAbaConfig] = useState('conta'); 
 
-      // Cache em memória local para renderização imediata
+      // Cache isolado especificamente pela empresa conectada
+      const activeCompId = impersonatedCompany ? impersonatedCompany.company_id : currentUser?.company_id;
+
       const [produtos, setProdutos] = useState(() => {
         try {
-          const c = localStorage.getItem('cache_prods');
+          if (!activeCompId) return [];
+          const c = localStorage.getItem(`cache_prods_${activeCompId}`);
           return c ? JSON.parse(c) : [];
         } catch(e) { return []; }
       });
 
       const [lancamentos, setLancamentos] = useState(() => {
         try {
-          const c = localStorage.getItem('cache_lancs');
+          if (!activeCompId) return [];
+          const c = localStorage.getItem(`cache_lancs_${activeCompId}`);
           return c ? JSON.parse(c) : [];
         } catch(e) { return []; }
       });
@@ -369,7 +384,7 @@
       const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.username === 'admin';
       const effectiveCompanyId = impersonatedCompany ? impersonatedCompany.company_id : currentUser?.company_id;
       const effectiveCompanyName = impersonatedCompany ? impersonatedCompany.company_name : (currentUser?.unidade || 'FoodStrick');
-
+      // Verificação em segundo plano da presença de suporte
       useEffect(() => {
         if (!isAuthenticated || !currentUser || isSuperAdmin) return;
         const checkSupport = async () => {
@@ -384,7 +399,7 @@
         return () => clearInterval(interval);
       }, [isAuthenticated, currentUser, isSuperAdmin]);
 
-      // Sincronização paralela em segundo plano
+      // CARREGAMENTO RIGOROSO: Cada empresa acede unicamente aos seus dados
       useEffect(() => {
         if (isAuthenticated && effectiveCompanyId && effectiveCompanyId !== 'foodstrick-master') {
           carregarTudoEmParalelo(effectiveCompanyId);
@@ -393,22 +408,37 @@
 
       async function carregarTudoEmParalelo(compId) {
         try {
+          let queryProd = supabaseClient.from('produtos').select('*');
+          let queryLanc = supabaseClient.from('lancamentos').select('*');
+
+          // A Cozinha Brasileira acede aos registos legados (company_id nulo)
+          // Qualquer outra empresa filtra unicamente o seu ID próprio
+          if (compId === 'cozinha-brasileira') {
+            queryProd = queryProd.or('company_id.eq.cozinha-brasileira,company_id.is.null');
+            queryLanc = queryLanc.or('company_id.eq.cozinha-brasileira,company_id.is.null');
+          } else {
+            queryProd = queryProd.eq('company_id', compId);
+            queryLanc = queryLanc.eq('company_id', compId);
+          }
+
           const [resProd, resLanc, resFech] = await Promise.all([
-            supabaseClient.from('produtos').select('*').or(`company_id.eq.${compId},company_id.eq.cozinha-brasileira,company_id.is.null`).order('nome'),
-            supabaseClient.from('lancamentos').select('*').or(`company_id.eq.${compId},company_id.eq.cozinha-brasileira,company_id.is.null`).order('data', { ascending: false }),
+            queryProd.order('nome'),
+            queryLanc.order('data', { ascending: false }),
             supabaseClient.from('fechamentos').select('*').eq('company_id', compId).order('data_fechamento', { ascending: false })
           ]);
 
           if (resProd.data) {
             setProdutos(resProd.data);
-            localStorage.setItem('cache_prods', JSON.stringify(resProd.data));
+            localStorage.setItem(`cache_prods_${compId}`, JSON.stringify(resProd.data));
           }
           if (resLanc.data) {
             setLancamentos(resLanc.data);
-            localStorage.setItem('cache_lancs', JSON.stringify(resLanc.data));
+            localStorage.setItem(`cache_lancs_${compId}`, JSON.stringify(resLanc.data));
           }
           if (resFech.data) setHistoricoFechamentos(resFech.data);
-        } catch (err) {}
+        } catch (err) {
+          console.error("Erro na sincronização:", err);
+        }
       }
 
       const handleLogin = async (e) => {
@@ -451,7 +481,13 @@
               return;
             }
 
-            const userObj = { username: userData.username, role: userData.role || 'operador', company_id: userData.company_id, unidade: comp ? comp.company_name : 'Minha Cozinha', avatar_url: userData.avatar_url };
+            const userObj = { 
+              username: userData.username, 
+              role: userData.role || 'operador', 
+              company_id: userData.company_id, 
+              unidade: comp ? comp.company_name : 'Minha Cozinha', 
+              avatar_url: userData.avatar_url 
+            };
             localStorage.setItem('foodstrick_master_session', JSON.stringify(userObj));
             setCurrentUser(userObj);
             setIsAuthenticated(true);
@@ -460,14 +496,12 @@
           }
         } catch (err) {}
 
-        setAuthError('Usuário ou senha incorretos.');
+        setAuthError('Utilizador ou palavra-passe incorretos.');
       };
 
       const handleLogout = async () => {
         if (impersonatedCompany) await handleStopImpersonation();
         localStorage.removeItem('foodstrick_master_session');
-        localStorage.removeItem('cache_prods');
-        localStorage.removeItem('cache_lancs');
         setIsAuthenticated(false);
         setCurrentUser(null);
         setImpersonatedCompany(null);
@@ -496,7 +530,7 @@
         setAbaAtiva('configuracoes');
         setSubAbaConfig('empresas');
       };
-
+      // Cálculos Financeiros
       const lancamentosAtivos = useMemo(() => lancamentos.filter(l => l.status === 'ativo' || l.status === null), [lancamentos]);
       const lancamentosExcluidos = useMemo(() => lancamentos.filter(l => l.status === 'excluido'), [lancamentos]);
 
@@ -553,12 +587,19 @@
         }
 
         const payload = {
-          company_id: compTarget, data: novoLancamento.data, tipo: novoLancamento.tipo,
-          descricao: desc, produto_id: novoLancamento.tipo === 'Venda' ? novoLancamento.produto_id : null,
+          company_id: compTarget, 
+          data: novoLancamento.data, 
+          tipo: novoLancamento.tipo,
+          descricao: desc, 
+          produto_id: novoLancamento.tipo === 'Venda' ? novoLancamento.produto_id : null,
           quantidade: novoLancamento.tipo === 'Venda' ? Number(novoLancamento.quantidade) : null,
-          pagamento: novoLancamento.pagamento, canal_categoria: novoLancamento.canal_categoria,
-          valor_total: total, custo_total: custo, resultado: novoLancamento.tipo === 'Venda' ? total - custo : -total,
-          fornecedor: novoLancamento.tipo === 'Despesa' ? novoLancamento.fornecedor : null, status: 'ativo'
+          pagamento: novoLancamento.pagamento, 
+          canal_categoria: novoLancamento.canal_categoria,
+          valor_total: total, 
+          custo_total: custo, 
+          resultado: novoLancamento.tipo === 'Venda' ? total - custo : -total,
+          fornecedor: novoLancamento.tipo === 'Despesa' ? novoLancamento.fornecedor : null, 
+          status: 'ativo'
         };
 
         const { error } = await supabaseClient.from('lancamentos').insert([payload]);
@@ -580,61 +621,129 @@
       async function handleSalvarProduto(e) {
         e.preventDefault();
         const compTarget = effectiveCompanyId || 'cozinha-brasileira';
-        const payload = { company_id: compTarget, nome: novoProduto.nome, preco_venda: parseFloat(novoProduto.preco_venda), custo_unitario: parseFloat(novoProduto.custo_unitario), observacao: novoProduto.observacao, ingredientes: [] };
+        const rawPreco = String(novoProduto.preco_venda).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+        const rawCusto = String(novoProduto.custo_unitario).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+        
+        const payload = { 
+          company_id: compTarget, 
+          nome: novoProduto.nome.trim(), 
+          preco_venda: parseFloat(rawPreco) || 0, 
+          custo_unitario: parseFloat(rawCusto) || 0, 
+          observacao: novoProduto.observacao ? novoProduto.observacao.trim() : '', 
+          ingredientes: [] 
+        };
+
         const { error } = await supabaseClient.from('produtos').insert([payload]);
-        if (error) alert("Erro: " + error.message);
-        else { carregarTudoEmParalelo(compTarget); setNovoProduto({ nome: '', preco_venda: '', custo_unitario: '', observacao: '' }); }
+        if (error) alert("Erro ao criar produto: " + error.message);
+        else { 
+          carregarTudoEmParalelo(compTarget); 
+          setNovoProduto({ nome: '', preco_venda: '', custo_unitario: '', observacao: '' }); 
+        }
       }
 
+      // 1. EDIÇÃO DE PRODUTO (CORRIGIDA COM TRATAMENTO DE VÍRGULAS)
       async function handleAtualizarProduto(e) {
         e.preventDefault();
         const compTarget = effectiveCompanyId || 'cozinha-brasileira';
-        const payload = { nome: modalEditarProduto.nome, preco_venda: parseFloat(modalEditarProduto.preco_venda), custo_unitario: parseFloat(modalEditarProduto.custo_unitario), observacao: modalEditarProduto.observacao };
+        const rawPreco = String(modalEditarProduto.preco_venda).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+        const rawCusto = String(modalEditarProduto.custo_unitario).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+
+        const payload = {
+          nome: modalEditarProduto.nome.trim(),
+          preco_venda: parseFloat(rawPreco) || 0,
+          custo_unitario: parseFloat(rawCusto) || 0,
+          observacao: modalEditarProduto.observacao ? modalEditarProduto.observacao.trim() : ''
+        };
+
         const { error } = await supabaseClient.from('produtos').update(payload).eq('id', modalEditarProduto.id);
-        if (error) alert("Erro ao atualizar: " + error.message);
-        else { carregarTudoEmParalelo(compTarget); setModalEditarProduto({ aberto: false, id: null, nome: '', preco_venda: '', custo_unitario: '', observacao: '' }); }
+        if (error) {
+          alert("Erro ao atualizar produto: " + error.message);
+        } else {
+          // Atualização imediata da interface
+          setProdutos(prev => prev.map(p => p.id === modalEditarProduto.id ? { ...p, ...payload } : p));
+          setModalEditarProduto({ aberto: false, id: null, nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
+          carregarTudoEmParalelo(compTarget);
+        }
       }
 
+      // 2. ELIMINAÇÃO DE PRODUTO (CORRIGIDA)
       async function deletarProduto(id) {
         const compTarget = effectiveCompanyId || 'cozinha-brasileira';
-        if (lancamentos.some(l => l.produto_id === id)) {
-          alert("Atenção: Este produto já possui vendas registradas e não pode ser apagado.");
-          setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' });
-          return;
-        }
         const { error } = await supabaseClient.from('produtos').delete().eq('id', id);
-        if (error) alert("Erro: " + error.message);
-        else { carregarTudoEmParalelo(compTarget); setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' }); }
+        if (error) {
+          alert("Erro ao eliminar produto: " + error.message);
+        } else {
+          setProdutos(prev => prev.filter(p => p.id !== id));
+          setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' });
+          carregarTudoEmParalelo(compTarget);
+        }
       }
 
+      // 3. ADIÇÃO DE INSUMO NA FICHA TÉCNICA (CORRIGIDA)
       async function handleAdicionarInsumo(e) {
         e.preventDefault();
         if (!modalFichaTecnica.produto) return;
         const prod = modalFichaTecnica.produto;
-        const listaAtual = Array.isArray(prod.ingredientes) ? prod.ingredientes : [];
-        const item = { id: Date.now().toString(), nome: novoInsumo.nome.trim(), quantidade: novoInsumo.quantidade.trim(), custo: parseFloat(novoInsumo.custo) || 0 };
-        const novaLista = [...listaAtual, item];
-        const novoCustoTotal = novaLista.reduce((acc, curr) => acc + Number(curr.custo || 0), 0);
+        let listaAtual = [];
+        if (Array.isArray(prod.ingredientes)) {
+          listaAtual = prod.ingredientes;
+        } else if (typeof prod.ingredientes === 'string') {
+          try { listaAtual = JSON.parse(prod.ingredientes); } catch(err) { listaAtual = []; }
+        }
 
-        const { error } = await supabaseClient.from('produtos').update({ ingredientes: novaLista, custo_unitario: novoCustoTotal }).eq('id', prod.id);
-        if (error) alert("Erro: " + error.message);
-        else {
-          setModalFichaTecnica({ aberto: true, produto: { ...prod, ingredientes: novaLista, custo_unitario: novoCustoTotal } });
+        const rawCusto = String(novoInsumo.custo).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+        const item = { 
+          id: Date.now().toString(), 
+          nome: novoInsumo.nome.trim(), 
+          quantidade: novoInsumo.quantidade.trim(), 
+          custo: parseFloat(rawCusto) || 0 
+        };
+
+        const novaLista = [...listaAtual, item];
+        const novoCustoTotal = novaLista.reduce((acc, curr) => acc + (Number(curr.custo) || 0), 0);
+
+        const { error } = await supabaseClient
+          .from('produtos')
+          .update({ ingredientes: novaLista, custo_unitario: novoCustoTotal })
+          .eq('id', prod.id);
+
+        if (error) {
+          alert("Erro ao adicionar ingrediente: " + error.message);
+        } else {
+          const prodAtualizado = { ...prod, ingredientes: novaLista, custo_unitario: novoCustoTotal };
+          setModalFichaTecnica({ aberto: true, produto: prodAtualizado });
+          setProdutos(prev => prev.map(p => p.id === prod.id ? prodAtualizado : p));
           setNovoInsumo({ nome: '', quantidade: '', custo: '' });
           carregarTudoEmParalelo(effectiveCompanyId);
         }
       }
 
+      // REMOÇÃO DE INSUMO NA FICHA TÉCNICA
       async function handleRemoverInsumo(insumoId) {
         if (!modalFichaTecnica.produto) return;
         const prod = modalFichaTecnica.produto;
-        const novaLista = (Array.isArray(prod.ingredientes) ? prod.ingredientes : []).filter(i => i.id !== insumoId);
-        const novoCustoTotal = novaLista.reduce((acc, curr) => acc + Number(curr.custo || 0), 0);
+        let listaAtual = Array.isArray(prod.ingredientes) ? prod.ingredientes : [];
+        const novaLista = listaAtual.filter(i => i.id !== insumoId);
+        const novoCustoTotal = novaLista.reduce((acc, curr) => acc + (Number(curr.custo) || 0), 0);
 
-        const { error } = await supabaseClient.from('produtos').update({ ingredientes: novaLista, custo_unitario: novaLista.length > 0 ? novoCustoTotal : prod.custo_unitario }).eq('id', prod.id);
-        if (error) alert("Erro: " + error.message);
-        else {
-          setModalFichaTecnica({ aberto: true, produto: { ...prod, ingredientes: novaLista, custo_unitario: novaLista.length > 0 ? novoCustoTotal : prod.custo_unitario } });
+        const { error } = await supabaseClient
+          .from('produtos')
+          .update({ 
+            ingredientes: novaLista, 
+            custo_unitario: novaLista.length > 0 ? novoCustoTotal : prod.custo_unitario 
+          })
+          .eq('id', prod.id);
+
+        if (error) {
+          alert("Erro ao remover ingrediente: " + error.message);
+        } else {
+          const prodAtualizado = { 
+            ...prod, 
+            ingredientes: novaLista, 
+            custo_unitario: novaLista.length > 0 ? novoCustoTotal : prod.custo_unitario 
+          };
+          setModalFichaTecnica({ aberto: true, produto: prodAtualizado });
+          setProdutos(prev => prev.map(p => p.id === prod.id ? prodAtualizado : p));
           carregarTudoEmParalelo(effectiveCompanyId);
         }
       }
@@ -648,7 +757,12 @@
         setProcessandoFechamento(true);
         const compTarget = effectiveCompanyId || 'cozinha-brasileira';
 
-        await supabaseClient.from('fechamentos').insert([{ company_id: compTarget, mes_ano: mesAno, relatorio: { faturamento, despesas: totalDespesas, lucro: resultadoMes, totalPratos, totalBebidas, ingredientes: arrayIngredientes, totalRegistros: lancamentosAtivos.length } }]);
+        await supabaseClient.from('fechamentos').insert([{ 
+          company_id: compTarget, 
+          mes_ano: mesAno, 
+          relatorio: { faturamento, despesas: totalDespesas, lucro: resultadoMes, totalPratos, totalBebidas, ingredientes: arrayIngredientes, totalRegistros: lancamentosAtivos.length } 
+        }]);
+
         const ids = lancamentosAtivos.map(l => l.id);
         await supabaseClient.from('lancamentos').update({ status: 'arquivado' }).in('id', ids);
 
@@ -671,7 +785,7 @@
         await supabaseClient.from('companies').insert([{ company_id: cleanSlug, company_name: cleanName, contact_phone: newCompanyPhone.trim(), status: 'ativo' }]);
         await supabaseClient.from('app_users').insert([{ username: newCompanyAdminUser.trim().toLowerCase(), password: newCompanyAdminPass.trim(), role: 'admin', company_id: cleanSlug }]);
 
-        alert(`Restaurante "${cleanName}" registrado!`);
+        alert(`Restaurante "${cleanName}" registado!`);
         setNewCompanyName(''); setNewCompanySlug(''); setNewCompanyPhone(''); setNewCompanyAdminUser(''); setNewCompanyAdminPass('');
         fetchCompanies();
       };
@@ -721,8 +835,7 @@
         setAbaAtiva(aba);
         setMobileMenuOpen(false);
       };
-
-      // TELA DE LOGIN
+      // ECRÃ DE LOGIN
       if (!isAuthenticated) {
         return (
           <div className="min-h-screen w-full flex items-center justify-center md:justify-start p-4 sm:p-6 md:p-16 lg:p-24 relative bg-cover bg-center" style={{ backgroundImage: `url("${LOGIN_BG_IMAGE}")` }}>
@@ -740,11 +853,11 @@
               {authError && <div className="mb-4 p-3 bg-red-950/60 border border-red-800 text-red-300 rounded-lg text-xs font-medium text-center">{authError}</div>}
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">Usuário</label>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">Utilizador</label>
                   <input type="text" placeholder="admin ou cozinha" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full bg-[#202020] text-white text-base md:text-sm px-4 py-3 md:py-2.5 rounded-lg border border-[#333] focus:border-[#D95B1E] outline-none" required />
                 </div>
                 <div className="relative">
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">Senha</label>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">Palavra-passe</label>
                   <input type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-[#202020] text-white text-base md:text-sm px-4 py-3 md:py-2.5 pr-10 rounded-lg border border-[#333] focus:border-[#D95B1E] outline-none" required />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-8 md:top-8 text-zinc-400 hover:text-white p-1">
                     {showPassword ? (
@@ -754,7 +867,7 @@
                     )}
                   </button>
                 </div>
-                <button type="submit" className="w-full btn-orange font-bold py-3.5 md:py-3 rounded-lg text-sm tracking-wide shadow-lg transition-all mt-2 active:scale-95">Acessar Sistema</button>
+                <button type="submit" className="w-full btn-orange font-bold py-3.5 md:py-3 rounded-lg text-sm tracking-wide shadow-lg transition-all mt-2 active:scale-95">Aceder ao Sistema</button>
               </form>
             </div>
           </div>
@@ -827,6 +940,187 @@
             </div>
           )}
 
+          {/* NOTIFICAÇÃO AUDITORIA */}
+          {adminInsideNotification && (
+            <div className="fixed top-14 md:top-4 left-3 right-3 md:left-72 z-40 p-3 bg-blue-950/95 border border-blue-500/60 rounded-xl flex items-center justify-between text-xs text-blue-200 shadow-2xl backdrop-blur-md">
+              <div className="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 shrink-0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
+                <span className="truncate"><strong>Suporte Conectado:</strong> {adminInsideNotification}</span>
+              </div>
+              <span className="bg-blue-900 text-blue-300 px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0">Ativo</span>
+            </div>
+          )}
+
+          {/* MODAL EXCLUSÃO LANÇAMENTO */}
+          {modalExclusao.aberto && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+              <div className="bg-[#171717] border border-[#333] rounded-xl p-5 sm:p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+                <h3 className="text-lg font-bold text-white mb-2">Excluir Lançamento</h3>
+                <p className="text-xs text-zinc-400 mb-5">Indique o motivo da exclusão:</p>
+                <div className="space-y-2 mb-6">
+                  {['Pedido cancelado', 'Erro de principiante', 'Erro técnico', 'Outro'].map(motivo => (
+                    <label key={motivo} className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${motivoExclusao === motivo ? 'border-[#D95B1E] bg-[#D95B1E]/10' : 'border-[#2d2d2d] hover:bg-[#202020]'}`}>
+                      <input type="radio" name="motivo" value={motivo} checked={motivoExclusao === motivo} onChange={(e) => setMotivoExclusao(e.target.value)} className="text-[#D95B1E]" />
+                      <span className="ml-3 text-xs text-white font-medium">{motivo}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => setModalExclusao({ aberto: false, idLancamento: null })} className="px-4 py-2.5 text-xs font-semibold text-zinc-400 hover:text-white">Cancelar</button>
+                  <button onClick={confirmarExclusao} className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold">Confirmar</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL FICHA TÉCNICA (OPÇÃO 1) */}
+          {modalFichaTecnica.aberto && modalFichaTecnica.produto && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
+              <div className="bg-[#161616] border border-[#2d2d2d] rounded-2xl p-4 sm:p-6 w-full max-w-2xl shadow-2xl my-auto max-h-[92vh] overflow-y-auto">
+                <div className="flex items-center justify-between pb-4 border-b border-[#262626] mb-5">
+                  <div className="flex items-center gap-2.5 overflow-hidden">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-950/60 border border-emerald-800/50 flex items-center justify-center text-emerald-400 shrink-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
+                    </div>
+                    <div className="truncate">
+                      <h3 className="text-sm sm:text-base font-bold text-white truncate">{modalFichaTecnica.produto.nome}</h3>
+                      <p className="text-[10px] sm:text-xs text-zinc-400">Ficha técnica e custos</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setModalFichaTecnica({ aberto: false, produto: null })} className="p-1.5 text-zinc-400 hover:text-white rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                  </button>
+                </div>
+
+                {(() => {
+                  const ingList = Array.isArray(modalFichaTecnica.produto.ingredientes) ? modalFichaTecnica.produto.ingredientes : [];
+                  const somaCusto = ingList.reduce((acc, curr) => acc + Number(curr.custo || 0), 0);
+                  const precoVenda = Number(modalFichaTecnica.produto.preco_venda || 0);
+                  const margemRs = precoVenda - (ingList.length > 0 ? somaCusto : Number(modalFichaTecnica.produto.custo_unitario || 0));
+                  const margemPct = precoVenda > 0 ? ((margemRs / precoVenda) * 100).toFixed(1) : 0;
+
+                  return (
+                    <div>
+                      <div className="grid grid-cols-3 gap-2 mb-4">
+                        <div className="bg-[#202020] border border-[#2d2d2d] p-2.5 rounded-xl text-center sm:text-left">
+                          <span className="text-[9px] uppercase font-bold text-zinc-400 block">Insumos</span>
+                          <span className="text-sm sm:text-lg font-bold text-white">{ingList.length}</span>
+                        </div>
+                        <div className="bg-[#202020] border border-[#2d2d2d] p-2.5 rounded-xl text-center sm:text-left">
+                          <span className="text-[9px] uppercase font-bold text-zinc-400 block">Custo Total</span>
+                          <span className="text-sm sm:text-lg font-bold text-emerald-400">R$ {somaCusto.toFixed(2)}</span>
+                        </div>
+                        <div className="bg-[#202020] border border-[#2d2d2d] p-2.5 rounded-xl text-center sm:text-left">
+                          <span className="text-[9px] uppercase font-bold text-zinc-400 block">Margem</span>
+                          <span className="text-sm sm:text-lg font-bold text-[#D95B1E]">{margemPct}%</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-[#1c1c1c] border border-[#262626] rounded-xl overflow-hidden mb-4">
+                        <div className="px-3 py-2 border-b border-[#262626] flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-white uppercase">Ingredientes</span>
+                          <span className="text-[10px] text-emerald-400 font-mono">R$ {somaCusto.toFixed(2)}</span>
+                        </div>
+
+                        {ingList.length === 0 ? (
+                          <div className="p-5 text-center text-xs text-zinc-500 italic">Nenhum ingrediente adicionado ainda.</div>
+                        ) : (
+                          <div className="max-h-40 overflow-y-auto divide-y divide-[#262626]">
+                            {ingList.map((insumo, index) => (
+                              <div key={insumo.id || index} className="px-3 py-2 flex items-center justify-between text-xs">
+                                <div className="truncate pr-2">
+                                  <span className="text-white font-medium block truncate">{insumo.nome}</span>
+                                  <span className="text-[10px] text-zinc-400">{insumo.quantidade}</span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="font-mono text-white">R$ {Number(insumo.custo).toFixed(2)}</span>
+                                  <button onClick={() => handleRemoverInsumo(insumo.id)} className="p-1 text-zinc-500 hover:text-red-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <form onSubmit={handleAdicionarInsumo} className="bg-[#202020] border border-[#2d2d2d] p-3.5 rounded-xl space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                          <div>
+                            <label className="block text-[10px] font-medium text-zinc-400 mb-1">Ingrediente</label>
+                            <input type="text" placeholder="Ex: Pão, Carne..." value={novoInsumo.nome} onChange={(e) => setNovoInsumo({ ...novoInsumo, nome: e.target.value })} className="w-full bg-[#161616] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none focus:border-emerald-500" required />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-medium text-zinc-400 mb-1">Quantidade</label>
+                            <input type="text" placeholder="Ex: 1 un, 150g..." value={novoInsumo.quantidade} onChange={(e) => setNovoInsumo({ ...novoInsumo, quantidade: e.target.value })} className="w-full bg-[#161616] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none focus:border-emerald-500" required />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-medium text-zinc-400 mb-1">Custo (R$)</label>
+                            <input type="text" placeholder="0.00" value={novoInsumo.custo} onChange={(e) => setNovoInsumo({ ...novoInsumo, custo: e.target.value })} className="w-full bg-[#161616] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none focus:border-emerald-500" required />
+                          </div>
+                        </div>
+                        <div className="flex justify-end pt-1">
+                          <button type="submit" className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-lg text-xs shadow-md">Adicionar à Ficha</button>
+                        </div>
+                      </form>
+
+                      <div className="flex justify-end pt-4">
+                        <button type="button" onClick={() => setModalFichaTecnica({ aberto: false, produto: null })} className="w-full sm:w-auto px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-semibold">Concluir</button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* MODAL EDITAR PRODUTO (OPÇÃO 2) */}
+          {modalEditarProduto.aberto && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+              <div className="bg-[#171717] border border-[#333] rounded-xl p-5 sm:p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+                <h3 className="text-lg font-bold text-white mb-2">Editar Produto & Preços</h3>
+                <form onSubmit={handleAtualizarProduto} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">Nome</label>
+                    <input type="text" value={modalEditarProduto.nome} onChange={(e) => setModalEditarProduto({ ...modalEditarProduto, nome: e.target.value })} className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 md:p-2.5 text-base md:text-xs text-white outline-none focus:border-[#D95B1E]" required />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Preço Venda (R$)</label>
+                      <input type="text" value={modalEditarProduto.preco_venda} onChange={(e) => setModalEditarProduto({ ...modalEditarProduto, preco_venda: e.target.value })} className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 md:p-2.5 text-base md:text-xs text-white outline-none focus:border-[#D95B1E]" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Custo Insumo (R$)</label>
+                      <input type="text" value={modalEditarProduto.custo_unitario} onChange={(e) => setModalEditarProduto({ ...modalEditarProduto, custo_unitario: e.target.value })} className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 md:p-2.5 text-base md:text-xs text-white outline-none focus:border-[#D95B1E]" required />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">Observação</label>
+                    <input type="text" value={modalEditarProduto.observacao} onChange={(e) => setModalEditarProduto({ ...modalEditarProduto, observacao: e.target.value })} className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 md:p-2.5 text-base md:text-xs text-white outline-none focus:border-[#D95B1E]" />
+                  </div>
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button type="button" onClick={() => setModalEditarProduto({ aberto: false, id: null, nome: '', preco_venda: '', custo_unitario: '', observacao: '' })} className="px-4 py-2.5 text-xs font-semibold text-zinc-400">Cancelar</button>
+                    <button type="submit" className="px-5 py-2.5 btn-orange rounded-lg text-xs font-bold">Salvar Alterações</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL EXCLUIR PRODUTO (OPÇÃO 3) */}
+          {modalExcluirProduto.aberto && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+              <div className="bg-[#171717] border border-[#333] rounded-xl p-5 sm:p-6 w-full max-w-md shadow-2xl">
+                <h3 className="text-lg font-bold text-white mb-2">Eliminar Produto</h3>
+                <p className="text-xs text-zinc-400 mb-6">Pretende remover <strong className="text-white">"{modalExcluirProduto.nome}"</strong> da sua lista?</p>
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' })} className="px-4 py-2.5 text-xs font-semibold text-zinc-400">Cancelar</button>
+                  <button onClick={() => deletarProduto(modalExcluirProduto.idProduto)} className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold">Eliminar</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* SIDEBAR DESKTOP */}
           <aside className="hidden md:flex w-64 bg-[#141414] border-r border-[#242424] p-5 flex-col justify-between shrink-0 h-screen sticky top-0 overflow-y-auto z-20">
             <div>
@@ -879,571 +1173,4 @@
               </button>
             </div>
           </aside>
-
-          {/* SUB-SIDEBAR DESKTOP */}
-          {abaAtiva === 'configuracoes' && (
-            <aside className="w-56 bg-[#111111] border-r border-[#242424] p-5 shrink-0 hidden md:block h-screen sticky top-0 overflow-y-auto z-10">
-              <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4">Ajustes & Gestão</h3>
-              <nav className="space-y-1">
-                {(!isSuperAdmin || impersonatedCompany) && (
-                  <button onClick={() => setSubAbaConfig('exclusoes')} className={`w-full text-left px-3 py-2 rounded-md text-xs font-medium ${subAbaConfig === 'exclusoes' ? 'bg-[#202020] text-[#D95B1E]' : 'text-zinc-400 hover:text-white'}`}>
-                    Exclusões (Lixeira)
-                  </button>
-                )}
-                <button onClick={() => setSubAbaConfig('conta')} className={`w-full text-left px-3 py-2 rounded-md text-xs font-medium ${subAbaConfig === 'conta' ? 'bg-[#202020] text-white' : 'text-zinc-400 hover:text-white'}`}>
-                  Minha Conta & Sessão
-                </button>
-                {isSuperAdmin && (
-                  <button onClick={() => { setSubAbaConfig('empresas'); fetchCompanies(); }} className={`w-full text-left px-3 py-2 rounded-md text-xs font-bold flex items-center gap-2 ${subAbaConfig === 'empresas' ? 'bg-blue-950/40 text-blue-400 border border-blue-900/50' : 'text-blue-400/70 hover:text-blue-300'}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>
-                    Gestão de Cozinhas (B2B)
-                  </button>
-                )}
-              </nav>
-            </aside>
-          )}
-
-          {/* CONTEÚDO PRINCIPAL */}
-          <main className="flex-1 bg-[#0f0f0f] p-4 sm:p-6 md:p-10 overflow-y-auto">
-
-            {impersonatedCompany && (
-              <div className="mb-4 sm:mb-6 p-3 bg-amber-500/15 border border-amber-500/40 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-amber-300">
-                <span><strong>[Modo Suporte Ativo]:</strong> {impersonatedCompany.company_name}</span>
-                <button onClick={handleStopImpersonation} className="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-black font-bold px-3 py-1.5 rounded-lg text-xs shadow-md">
-                  Voltar ao Painel Master
-                </button>
-              </div>
-            )}
-
-            {isSuperAdmin && !impersonatedCompany && abaAtiva !== 'configuracoes' && (
-              <div className="max-w-xl bg-[#161616] p-6 sm:p-8 rounded-xl border border-[#2d2d2d] text-center mx-auto mt-6">
-                <h2 className="text-lg sm:text-xl font-bold text-white mb-2">Painel Global FoodStrick Master</h2>
-                <p className="text-zinc-400 text-xs sm:text-sm mb-5">Acesse a aba de Configurações para gerenciar as cozinhas cadastradas.</p>
-                <button onClick={() => { setAbaAtiva('configuracoes'); setSubAbaConfig('empresas'); }} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-6 rounded-lg text-sm">
-                  Abrir Gestão B2B
-                </button>
-              </div>
-            )}
-
-            {/* 1. ABA PAINEL GERAL */}
-            {abaAtiva === 'painel' && (!isSuperAdmin || impersonatedCompany) && (
-              <div className="max-w-6xl">
-                <header className="mb-5 sm:mb-8">
-                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">Painel Gerencial</h1>
-                  <p className="text-[11px] sm:text-xs text-zinc-400">Visão consolidada de vendas, margens e despesas</p>
-                </header>
-
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 mb-6 sm:mb-8">
-                  <div className="bg-[#161616] border border-[#262626] p-3.5 sm:p-5 rounded-xl">
-                    <span className="text-[10px] sm:text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">Faturamento</span>
-                    <p className="text-base sm:text-2xl font-bold text-white mt-1">R$ {faturamento.toFixed(2)}</p>
-                  </div>
-                  <div className="bg-[#161616] border border-[#262626] p-3.5 sm:p-5 rounded-xl">
-                    <span className="text-[10px] sm:text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">Lucro Produtos</span>
-                    <p className="text-base sm:text-2xl font-bold text-emerald-400 mt-1">R$ {lucroProdutos.toFixed(2)}</p>
-                  </div>
-                  <div className="bg-[#161616] border border-[#262626] p-3.5 sm:p-5 rounded-xl">
-                    <span className="text-[10px] sm:text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">Despesas</span>
-                    <p className="text-base sm:text-2xl font-bold text-red-500 mt-1">R$ {totalDespesas.toFixed(2)}</p>
-                  </div>
-                  <div className="bg-[#161616] border border-[#262626] p-3.5 sm:p-5 rounded-xl">
-                    <span className="text-[10px] sm:text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">Resultado</span>
-                    <p className={`text-base sm:text-2xl font-bold mt-1 ${resultadoMes >= 0 ? 'text-[#D95B1E]' : 'text-red-500'}`}>R$ {resultadoMes.toFixed(2)}</p>
-                  </div>
-                </div>
-
-                <div className="bg-[#161616] border border-[#262626] rounded-xl p-4 sm:p-5 overflow-hidden shadow-sm">
-                  <h2 className="text-xs sm:text-sm font-bold text-white mb-3">Últimos Lançamentos</h2>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs text-zinc-400 min-w-[550px]">
-                      <thead className="border-b border-[#262626]">
-                        <tr>
-                          <th className="pb-2.5 uppercase">Data</th>
-                          <th className="pb-2.5 uppercase">Tipo</th>
-                          <th className="pb-2.5 uppercase">Descrição</th>
-                          <th className="pb-2.5 uppercase text-center">Qtd</th>
-                          <th className="pb-2.5 uppercase">Canal</th>
-                          <th className="pb-2.5 uppercase text-right">Valor</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#262626]">
-                        {lancamentosAtivos.slice(0, 10).map(l => (
-                          <tr key={l.id} className="hover:bg-[#1c1c1c]">
-                            <td className="py-2.5">{l.data}</td>
-                            <td className="py-2.5"><span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${l.tipo === 'Venda' ? 'bg-emerald-950/60 text-emerald-400' : 'bg-red-950/60 text-red-400'}`}>{l.tipo}</span></td>
-                            <td className="py-2.5 text-white font-medium truncate max-w-[150px]">{l.descricao}{l.fornecedor && <span className="text-[10px] text-zinc-500 block">Forn: {l.fornecedor}</span>}</td>
-                            <td className="py-2.5 text-center text-white">{l.quantidade || '-'}</td>
-                            <td className="py-2.5">{l.canal_categoria}</td>
-                            <td className="py-2.5 text-right font-bold text-white">R$ {Number(l.valor_total).toFixed(2)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 2. ABA LANÇAMENTOS */}
-            {abaAtiva === 'lancamentos' && (!isSuperAdmin || impersonatedCompany) && (
-              <div className="max-w-6xl">
-                <header className="mb-5"><h1 className="text-xl sm:text-2xl font-bold text-white">Novo Lançamento</h1></header>
-                <form onSubmit={handleSalvarLancamento} className="bg-[#161616] border border-[#262626] p-4 sm:p-6 rounded-xl mb-6 space-y-3 sm:space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-medium text-zinc-400 mb-1">Operação</label>
-                      <select value={novoLancamento.tipo} onChange={e => setNovoLancamento({...novoLancamento, tipo: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none">
-                        <option>Venda</option><option>Despesa</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-zinc-400 mb-1">Data</label>
-                      <input type="date" value={novoLancamento.data} onChange={e => setNovoLancamento({...novoLancamento, data: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
-                    </div>
-                    {novoLancamento.tipo === 'Venda' ? (
-                      <div className="sm:col-span-2">
-                        <label className="block text-[11px] font-medium text-zinc-400 mb-1">Produto</label>
-                        <select value={novoLancamento.produto_id} onChange={e => setNovoLancamento({...novoLancamento, produto_id: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required>
-                          <option value="">Selecione o produto...</option>
-                          {produtos.map(p => <option key={p.id} value={p.id}>{p.nome} (R$ {Number(p.preco_venda).toFixed(2)})</option>)}
-                        </select>
-                      </div>
-                    ) : (
-                      <>
-                        <div>
-                          <label className="block text-[11px] font-medium text-zinc-400 mb-1">Descrição</label>
-                          <input type="text" placeholder="Ex: Insumos, contas..." value={novoLancamento.descricao} onChange={e => setNovoLancamento({...novoLancamento, descricao: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-medium text-zinc-400 mb-1">Fornecedor (Opcional)</label>
-                          <input type="text" value={novoLancamento.fornecedor} onChange={e => setNovoLancamento({...novoLancamento, fornecedor: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                    {novoLancamento.tipo === 'Venda' ? (
-                      <div>
-                        <label className="block text-[11px] font-medium text-zinc-400 mb-1">Quantidade</label>
-                        <input type="number" min="1" value={novoLancamento.quantidade} onChange={e => setNovoLancamento({...novoLancamento, quantidade: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
-                      </div>
-                    ) : (
-                      <div>
-                        <label className="block text-[11px] font-medium text-zinc-400 mb-1">Valor (R$)</label>
-                        <input type="number" step="0.01" value={novoLancamento.valor_despesa} onChange={e => setNovoLancamento({...novoLancamento, valor_despesa: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
-                      </div>
-                    )}
-                    <div>
-                      <label className="block text-[11px] font-medium text-zinc-400 mb-1">Pagamento</label>
-                      <select value={novoLancamento.pagamento} onChange={e => setNovoLancamento({...novoLancamento, pagamento: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none">
-                        <option>Pix</option><option>Cartão</option><option>Dinheiro</option><option>Transferência</option><option>Outro</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-zinc-400 mb-1">Canal / Categoria</label>
-                      <select value={novoLancamento.canal_categoria} onChange={e => setNovoLancamento({...novoLancamento, canal_categoria: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none">
-                        <option>Delivery</option><option>Retirada</option><option>Evento</option><option>Insumos</option><option>Embalagens</option><option>Bebidas</option><option>Outros</option>
-                      </select>
-                    </div>
-                    <div className="flex items-end">
-                      <button type="submit" className="w-full btn-orange font-bold py-3 md:py-2.5 rounded-lg text-xs shadow-md">Registar Operação</button>
-                    </div>
-                  </div>
-                </form>
-
-                <div className="bg-[#161616] border border-[#262626] rounded-xl p-4 sm:p-5 overflow-hidden shadow-sm">
-                  <h2 className="text-xs sm:text-sm font-bold text-white mb-3">Histórico Completo</h2>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs text-zinc-400 min-w-[580px]">
-                      <thead className="border-b border-[#262626]">
-                        <tr>
-                          <th className="pb-2.5 uppercase">Data</th>
-                          <th className="pb-2.5 uppercase">Tipo</th>
-                          <th className="pb-2.5 uppercase">Descrição</th>
-                          <th className="pb-2.5 uppercase text-center">Qtd</th>
-                          <th className="pb-2.5 uppercase">Canal</th>
-                          <th className="pb-2.5 uppercase text-right">Valor</th>
-                          <th className="pb-2.5 uppercase text-center"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#262626]">
-                        {lancamentosAtivos.map(l => (
-                          <tr key={l.id} className="hover:bg-[#1c1c1c] group">
-                            <td className="py-2.5">{l.data}</td>
-                            <td className="py-2.5"><span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${l.tipo === 'Venda' ? 'bg-emerald-950/60 text-emerald-400' : 'bg-red-950/60 text-red-400'}`}>{l.tipo}</span></td>
-                            <td className="py-2.5 text-white font-medium">{l.descricao}{l.fornecedor && <span className="text-[10px] text-zinc-500 block">Forn: {l.fornecedor}</span>}</td>
-                            <td className="py-2.5 text-center text-white">{l.quantidade || '-'}</td>
-                            <td className="py-2.5">{l.canal_categoria}</td>
-                            <td className="py-2.5 text-right font-bold text-white">R$ {Number(l.valor_total).toFixed(2)}</td>
-                            <td className="py-2.5 text-center">
-                              <button onClick={() => setModalExclusao({ aberto: true, idLancamento: l.id })} className="p-1.5 text-zinc-500 hover:text-red-400 rounded">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 3. ABA PRODUTOS & CARDÁPIO */}
-            {abaAtiva === 'produtos' && (!isSuperAdmin || impersonatedCompany) && (
-              <div className="max-w-6xl">
-                <header className="mb-5"><h1 className="text-xl sm:text-2xl font-bold text-white">Produtos & Cardápio</h1></header>
-                <form onSubmit={handleSalvarProduto} className="bg-[#161616] border border-[#262626] p-4 sm:p-6 rounded-xl mb-6 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-medium text-zinc-400 mb-1">Nome do Item</label>
-                      <input type="text" value={novoProduto.nome} onChange={e => setNovoProduto({...novoProduto, nome: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-zinc-400 mb-1">Preço Venda (R$)</label>
-                      <input type="number" step="0.01" value={novoProduto.preco_venda} onChange={e => setNovoProduto({...novoProduto, preco_venda: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-zinc-400 mb-1">Custo Insumo (R$)</label>
-                      <input type="number" step="0.01" value={novoProduto.custo_unitario} onChange={e => setNovoProduto({...novoProduto, custo_unitario: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
-                    </div>
-                    <div className="flex items-end">
-                      <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 md:py-2.5 rounded-lg text-xs shadow-md">Guardar Produto</button>
-                    </div>
-                  </div>
-                </form>
-
-                <div className="bg-[#161616] border border-[#262626] rounded-xl p-4 sm:p-5 overflow-hidden shadow-sm">
-                  <h2 className="text-xs sm:text-sm font-bold text-white mb-3">Itens Registados ({produtos.length})</h2>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs text-zinc-400 min-w-[580px]">
-                      <thead className="border-b border-[#262626]">
-                        <tr>
-                          <th className="pb-2.5 uppercase">Item</th>
-                          <th className="pb-2.5 uppercase">Preço Venda</th>
-                          <th className="pb-2.5 uppercase">Custo</th>
-                          <th className="pb-2.5 uppercase">Margem Bruta</th>
-                          <th className="pb-2.5 uppercase">Margem (%)</th>
-                          <th className="pb-2.5 uppercase text-right pr-2">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#262626]">
-                        {produtos.map(p => {
-                          const margem = Number(p.preco_venda) - Number(p.custo_unitario);
-                          const pct = p.preco_venda > 0 ? ((margem / p.preco_venda) * 100).toFixed(1) : 0;
-                          const totalIng = Array.isArray(p.ingredientes) ? p.ingredientes.length : 0;
-                          return (
-                            <tr key={p.id} className="hover:bg-[#1c1c1c]">
-                              <td className="py-2.5 text-white font-medium">
-                                {p.nome}
-                                {totalIng > 0 && (
-                                  <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-900/60">
-                                    {totalIng}
-                                  </span>
-                                )}
-                              </td>
-                              <td className="py-2.5 text-white">R$ {Number(p.preco_venda).toFixed(2)}</td>
-                              <td className="py-2.5">R$ {Number(p.custo_unitario).toFixed(2)}</td>
-                              <td className="py-2.5 font-bold text-emerald-400">R$ {margem.toFixed(2)}</td>
-                              <td className="py-2.5 text-zinc-300">{pct}%</td>
-                              <td className="py-2.5 text-right pr-2">
-                                <div className="flex items-center justify-end gap-1">
-                                  <button onClick={() => setModalFichaTecnica({ aberto: true, produto: p })} className="p-1.5 text-zinc-400 hover:text-emerald-400 rounded" title="Ficha Técnica">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
-                                  </button>
-                                  <button onClick={() => setModalEditarProduto({ aberto: true, id: p.id, nome: p.nome, preco_venda: p.preco_venda, custo_unitario: p.custo_unitario, observacao: p.observacao || '' })} className="p-1.5 text-zinc-400 hover:text-amber-400 rounded" title="Editar Preço">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                                  </button>
-                                  <button onClick={() => setModalExcluirProduto({ aberto: true, idProduto: p.id, nome: p.nome })} className="p-1.5 text-zinc-400 hover:text-red-400 rounded" title="Eliminar">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 4. ABA FICHAS TÉCNICAS */}
-            {abaAtiva === 'fichas' && (!isSuperAdmin || impersonatedCompany) && (
-              <div className="max-w-6xl">
-                <header className="mb-5">
-                  <h1 className="text-xl sm:text-2xl font-bold text-white">Central de Fichas Técnicas</h1>
-                  <p className="text-[11px] sm:text-xs text-zinc-400">Controle de insumos e pesagem</p>
-                </header>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {produtos.map(p => {
-                    const ingList = Array.isArray(p.ingredientes) ? p.ingredientes : [];
-                    const somaCusto = ingList.reduce((acc, curr) => acc + Number(curr.custo || 0), 0);
-                    const custoFinal = ingList.length > 0 ? somaCusto : Number(p.custo_unitario || 0);
-                    const preco = Number(p.preco_venda || 0);
-                    const margem = preco - custoFinal;
-
-                    return (
-                      <div key={p.id} className="bg-[#161616] border border-[#262626] rounded-xl p-4 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-start justify-between mb-2.5">
-                            <div>
-                              <h3 className="text-sm sm:text-base font-bold text-white">{p.nome}</h3>
-                              <span className="text-[10px] text-zinc-500">{ingList.length} insumos</span>
-                            </div>
-                            <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-900/60">
-                              R$ {custoFinal.toFixed(2)}
-                            </span>
-                          </div>
-
-                          <div className="bg-[#1f1f1f] rounded-lg p-2.5 my-2 space-y-1 text-xs text-zinc-300">
-                            {ingList.length === 0 ? (
-                              <p className="text-zinc-500 italic text-[11px]">Nenhum ingrediente adicionado.</p>
-                            ) : (
-                              ingList.slice(0, 3).map((item, idx) => (
-                                <div key={idx} className="flex justify-between text-[11px]">
-                                  <span className="text-zinc-400 truncate max-w-[130px]">{item.nome} ({item.quantidade})</span>
-                                  <span className="text-white font-mono">R$ {Number(item.custo).toFixed(2)}</span>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="pt-2.5 border-t border-[#262626] flex items-center justify-between">
-                          <span className="text-emerald-400 text-xs font-semibold">Margem: R$ {margem.toFixed(2)}</span>
-                          <button onClick={() => setModalFichaTecnica({ aberto: true, produto: p })} className="bg-emerald-950/60 hover:bg-emerald-900 text-emerald-400 border border-emerald-800/60 font-bold px-3 py-1.5 rounded-lg text-xs">
-                            Abrir Ficha
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* 5. ABA FECHAMENTO MENSAL */}
-            {abaAtiva === 'fechamento' && (!isSuperAdmin || impersonatedCompany) && (
-              <div className="max-w-6xl">
-                <header className="mb-5">
-                  <h1 className="text-xl sm:text-2xl font-bold text-white">Fechamento do Mês</h1>
-                  <p className="text-[11px] sm:text-xs text-zinc-400">Consolidação e reinício de ciclo</p>
-                </header>
-
-                <div className="bg-[#161616] border border-[#D95B1E]/40 rounded-2xl p-4 sm:p-6 mb-6 shadow-xl">
-                  <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-[#262626]">
-                    <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D95B1E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
-                      Resumo Atual
-                    </h2>
-                    <span className="text-[10px] sm:text-xs font-mono font-bold text-[#D95B1E] bg-[#D95B1E]/10 border border-[#D95B1E]/30 px-2 py-0.5 rounded">
-                      {lancamentosAtivos.length} ativos
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 mb-5">
-                    <div className="bg-[#1f1f1f] p-3 rounded-xl border border-[#2d2d2d]"><span className="text-[9px] text-zinc-500 uppercase block">Faturamento</span><span className="text-sm sm:text-lg font-bold text-white">R$ {faturamento.toFixed(2)}</span></div>
-                    <div className="bg-[#1f1f1f] p-3 rounded-xl border border-[#2d2d2d]"><span className="text-[9px] text-zinc-500 uppercase block">Despesas</span><span className="text-sm sm:text-lg font-bold text-red-400">R$ {totalDespesas.toFixed(2)}</span></div>
-                    <div className="bg-[#1f1f1f] p-3 rounded-xl border border-[#2d2d2d]"><span className="text-[9px] text-zinc-500 uppercase block">Lucro</span><span className="text-sm sm:text-lg font-bold text-emerald-400">R$ {resultadoMes.toFixed(2)}</span></div>
-                    <div className="bg-[#1f1f1f] p-3 rounded-xl border border-[#2d2d2d]"><span className="text-[9px] text-zinc-500 uppercase block">Volume</span><span className="text-xs sm:text-sm font-bold text-zinc-200 mt-0.5 block">{totalPratos}P / {totalBebidas}B</span></div>
-                  </div>
-
-                  <button onClick={handleExecutarFechamento} disabled={processandoFechamento || lancamentosAtivos.length === 0} className="w-full bg-[#D95B1E] hover:bg-[#c34e17] disabled:opacity-50 text-white font-bold py-3.5 sm:py-3 rounded-xl text-xs transition-all shadow-lg active:scale-95">
-                    {processandoFechamento ? 'A processar...' : 'Encerrar Mês & Arquivar Lançamentos'}
-                  </button>
-                </div>
-
-                <div>
-                  <h2 className="text-sm sm:text-base font-bold text-white mb-3">Extratos Anteriores</h2>
-                  {historicoFechamentos.length === 0 ? (
-                    <div className="bg-[#161616] border border-[#262626] rounded-xl p-5 text-center text-zinc-500 text-xs italic">Nenhum fechamento realizado até ao momento.</div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {historicoFechamentos.map(fech => (
-                        <div key={fech.id} className="bg-[#161616] border border-[#262626] rounded-xl p-4">
-                          <div className="flex justify-between items-center pb-2 border-b border-[#262626] mb-2">
-                            <h3 className="font-bold text-white text-xs">Mês: {fech.mes_ano}</h3>
-                            <span className="text-[10px] text-zinc-500">{new Date(fech.data_fechamento).toLocaleDateString()}</span>
-                          </div>
-                          <div className="space-y-1 text-xs">
-                            <div className="flex justify-between"><span className="text-zinc-400">Faturação:</span><span className="text-white font-mono">R$ {Number(fech.relatorio.faturamento).toFixed(2)}</span></div>
-                            <div className="flex justify-between"><span className="text-zinc-400">Despesas:</span><span className="text-red-400 font-mono">R$ {Number(fech.relatorio.despesas).toFixed(2)}</span></div>
-                            <div className="flex justify-between border-t border-[#262626] pt-1 font-bold"><span className="text-zinc-300">Lucro:</span><span className="text-emerald-400 font-mono">R$ {Number(fech.relatorio.lucro).toFixed(2)}</span></div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* 6. CONFIGURAÇÕES & ADMINISTRAÇÃO B2B */}
-            {abaAtiva === 'configuracoes' && (
-              <div className="max-w-6xl">
-                <div className="md:hidden flex items-center gap-1.5 overflow-x-auto pb-3 mb-4 border-b border-[#242424]">
-                  {(!isSuperAdmin || impersonatedCompany) && (
-                    <button onClick={() => setSubAbaConfig('exclusoes')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap ${subAbaConfig === 'exclusoes' ? 'bg-[#D95B1E] text-white' : 'bg-[#1c1c1c] text-zinc-400'}`}>
-                      Lixeira
-                    </button>
-                  )}
-                  <button onClick={() => setSubAbaConfig('conta')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap ${subAbaConfig === 'conta' ? 'bg-[#D95B1E] text-white' : 'bg-[#1c1c1c] text-zinc-400'}`}>
-                    Minha Conta
-                  </button>
-                  {isSuperAdmin && (
-                    <button onClick={() => { setSubAbaConfig('empresas'); fetchCompanies(); }} className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap ${subAbaConfig === 'empresas' ? 'bg-blue-600 text-white' : 'bg-[#1c1c1c] text-blue-400'}`}>
-                      Gestão Cozinhas (B2B)
-                    </button>
-                  )}
-                </div>
-
-                {subAbaConfig === 'exclusoes' && (!isSuperAdmin || impersonatedCompany) && (
-                  <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-white mb-1">Lixeira de Exclusões</h1>
-                    <div className="bg-[#161616] border border-[#262626] rounded-xl p-4 overflow-x-auto mt-4">
-                      {lancamentosExcluidos.length === 0 ? <p className="text-zinc-500 text-xs italic">Nenhum registo cancelado.</p> : (
-                        <table className="w-full text-left text-xs text-zinc-400 min-w-[500px]">
-                          <thead className="border-b border-[#262626]">
-                            <tr><th className="pb-2.5 uppercase">Data</th><th className="pb-2.5 uppercase">Descrição</th><th className="pb-2.5 uppercase text-right">Valor</th><th className="pb-2.5 uppercase text-red-400 pl-4">Motivo</th></tr>
-                          </thead>
-                          <tbody className="divide-y divide-[#262626]">
-                            {lancamentosExcluidos.map(l => (
-                              <tr key={l.id} className="hover:bg-[#1c1c1c]">
-                                <td className="py-2.5">{l.data}</td>
-                                <td className="py-2.5 text-zinc-400 line-through">{l.descricao}</td>
-                                <td className="py-2.5 text-right text-zinc-400 line-through">R$ {Number(l.valor_total).toFixed(2)}</td>
-                                <td className="py-2.5 text-red-400 font-bold pl-4">{l.motivo_exclusao}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {subAbaConfig === 'empresas' && isSuperAdmin && (
-                  <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-white mb-4">Gestão de Clientes (B2B)</h1>
-                    <form onSubmit={handleCreateCompanyB2B} className="bg-[#161616] border border-[#262626] p-4 sm:p-6 rounded-xl mb-6 space-y-3">
-                      <h2 className="text-xs font-bold text-blue-400 uppercase tracking-wider">Registar Nova Cozinha</h2>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                        <input type="text" placeholder="Nome do Cliente" value={newCompanyName} onChange={e => setNewCompanyName(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
-                        <input type="text" placeholder="ID Interno" value={newCompanySlug} onChange={e => setNewCompanySlug(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" />
-                        <input type="text" placeholder="WhatsApp / Telefone" value={newCompanyPhone} onChange={e => setNewCompanyPhone(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" />
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        <input type="text" placeholder="Login" value={newCompanyAdminUser} onChange={e => setNewCompanyAdminUser(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
-                        <input type="password" placeholder="Palavra-passe" value={newCompanyAdminPass} onChange={e => setNewCompanyAdminPass(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
-                      </div>
-                      <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-lg text-xs">Ativar Cozinha</button>
-                    </form>
-
-                    <div className="bg-[#161616] border border-[#262626] rounded-xl p-4">
-                      <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Cozinhas Registadas ({companiesList.length})</h2>
-                      <div className="space-y-2">
-                        {companiesList.map(comp => (
-                          <div key={comp.id} className="bg-[#202020] p-3 rounded-lg border border-[#2d2d2d] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                            <div>
-                              <p className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">{comp.company_name} <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${comp.status === 'ativo' ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}`}>{comp.status}</span></p>
-                              <p className="text-[10px] text-zinc-500 font-mono">ID: {comp.company_id}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button onClick={() => handleStartImpersonation(comp)} className="flex-1 sm:flex-initial bg-amber-500/10 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs font-bold">Aceder Painel ↗</button>
-                              <button onClick={() => handleToggleCompanyStatus(comp.id, comp.status)} className="bg-zinc-800 text-zinc-300 px-3 py-1.5 rounded-lg text-xs font-medium">{comp.status === 'ativo' ? 'Suspender' : 'Reativar'}</button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {subAbaConfig === 'conta' && (
-                  <div className="bg-[#161616] border border-[#262626] p-5 sm:p-8 rounded-2xl w-full">
-                    <div className="flex flex-col lg:flex-row gap-6 sm:gap-10">
-                      <div className="flex flex-col items-center shrink-0">
-                        <div className="relative group mb-3">
-                          <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden bg-[#111111] border-2 border-[#D95B1E] shadow-xl flex items-center justify-center">
-                            {currentUser?.avatar_url ? (
-                              <img src={currentUser.avatar_url} alt="Perfil" className="w-full h-full object-cover" />
-                            ) : (
-                              <span className="text-4xl sm:text-5xl font-black text-[#D95B1E] uppercase">
-                                {currentUser?.username ? currentUser.username.charAt(0) : '?'}
-                              </span>
-                            )}
-                          </div>
-                          <button onClick={() => avatarInputRef.current?.click()} className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[11px] font-semibold cursor-pointer">
-                            Mudar Foto
-                          </button>
-                          <input type="file" accept="image/*" ref={avatarInputRef} onChange={handleAvatarUpload} className="hidden" />
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <button onClick={() => avatarInputRef.current?.click()} className="text-xs text-[#D95B1E] hover:text-[#c34e17] font-semibold">Alterar foto</button>
-                          {currentUser?.avatar_url && <button onClick={handleRemoveAvatar} className="text-xs text-zinc-500 hover:text-red-400">Remover</button>}
-                        </div>
-                      </div>
-
-                      <div className="flex-1 w-full border-t lg:border-t-0 lg:border-l border-[#262626] pt-5 lg:pt-0 lg:pl-10">
-                        <h1 className="text-lg sm:text-2xl font-bold text-white mb-1 sm:mb-2">Informações da Sessão</h1>
-                        <p className="text-[11px] sm:text-xs text-zinc-400 mb-5">Gestão das credenciais ativas do sistema.</p>
-                        <div className="space-y-3 sm:space-y-5">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="bg-[#1f1f1f] border border-[#2d2d2d] rounded-xl p-3.5">
-                              <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-0.5">Utilizador</span>
-                              <span className="font-bold text-white text-sm sm:text-base">{currentUser?.username}</span>
-                            </div>
-                            <div className="bg-[#1f1f1f] border border-[#2d2d2d] rounded-xl p-3.5">
-                              <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-0.5">Função</span>
-                              <span className="font-bold text-[#D95B1E] uppercase text-sm sm:text-base">{currentUser?.role}</span>
-                            </div>
-                          </div>
-                          <div className="bg-[#1f1f1f] border border-[#2d2d2d] rounded-xl p-3.5">
-                            <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-0.5">Unidade Ativa</span>
-                            <span className="font-bold text-white text-sm sm:text-lg block truncate">{effectiveCompanyName}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </main>
-
-          {/* CURSOR MULTIPLAYER */}
-          {isSupportSessionActive && (
-            <LiveCursor 
-              companyId={effectiveCompanyId}
-              currentUsername={currentUser?.username}
-              currentUserRole={currentUser?.role}
-              targetUsername={isSuperAdmin ? 'cozinha' : 'admin'}
-              isActive={isSupportSessionActive}
-              supabaseClient={supabaseClient}
-            />
-          )}
-
-          {/* CHAT DE SUPORTE */}
-          {isSupportSessionActive && (
-            <SupportChat 
-              companyId={effectiveCompanyId}
-              currentUsername={currentUser?.username}
-              currentUserRole={currentUser?.role}
-              operatorUsername={isSuperAdmin ? 'cozinha' : currentUser?.username}
-              isVisible={isSupportSessionActive}
-              supabaseClient={supabaseClient}
-            />
-          )}
-
-        </div>
-      );
-    }
-
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-  </script>
-</body>
-</html>
+          
