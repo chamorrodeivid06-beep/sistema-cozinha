@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cozinha Brasileira | Gestão Operacional</title>
+  <title>FoodStrick | Plataforma de Gestão Gastronômica</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
@@ -30,27 +30,41 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
     
-    // CREDENCIAIS DO SUPABASE
+    // SUAS CREDENCIAIS DO SUPABASE CONECTADAS
     const SUPABASE_URL = 'https://ddngvelrtqmfgaeqsjem.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_EhLCuypZr6vHrSKDCrHxQg_n7BvKxBU';
-    
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    function App() {
-      // Abas de navegação
-      const [abaAtiva, setAbaAtiva] = useState('painel');
-      const [subAbaAtiva, setSubAbaAtiva] = useState('exclusoes');
+    const LOGIN_BG_IMAGE = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=1920&auto=format&fit=crop";
 
+    function App() {
+      const [isAuthenticated, setIsAuthenticated] = useState(false);
+      const [currentUser, setCurrentUser] = useState(null);
+
+      // Modo Suporte (Super Admin espelhando uma cozinha)
+      const [impersonatedCompany, setImpersonatedCompany] = useState(null);
+
+      // Estados de Login
+      const [username, setUsername] = useState('');
+      const [password, setPassword] = useState('');
+      const [showPassword, setShowPassword] = useState(false);
+      const [authError, setAuthError] = useState('');
+
+      // Navegação
+      const [abaAtiva, setAbaAtiva] = useState('painel'); 
+      const [subAbaConfig, setSubAbaConfig] = useState('exclusoes'); 
+
+      // Dados Operacionais
       const [produtos, setProdutos] = useState([]);
       const [lancamentos, setLancamentos] = useState([]);
-      const [carregando, setCarregando] = useState(true);
+      const [carregando, setCarregando] = useState(false);
 
       // Modais
       const [modalExclusao, setModalExclusao] = useState({ aberto: false, idLancamento: null });
       const [motivoExclusao, setMotivoExclusao] = useState('Pedido cancelado');
-      
       const [modalExcluirProduto, setModalExcluirProduto] = useState({ aberto: false, idProduto: null, nome: '' });
 
+      // Formulários
       const [novoLancamento, setNovoLancamento] = useState({
         data: new Date().toISOString().split('T')[0],
         tipo: 'Venda', produto_id: '', descricao: '', quantidade: 1, 
@@ -61,21 +75,122 @@
         nome: '', preco_venda: '', custo_unitario: '', observacao: ''
       });
 
-      useEffect(() => { carregarDados(); }, []);
+      // Gestão de Cozinhas B2B (Super Admin)
+      const [companiesList, setCompaniesList] = useState([]);
+      const [newCompanyName, setNewCompanyName] = useState('');
+      const [newCompanySlug, setNewCompanySlug] = useState('');
+      const [newCompanyPhone, setNewCompanyPhone] = useState('');
+      const [newCompanyAdminUser, setNewCompanyAdminUser] = useState('');
+      const [newCompanyAdminPass, setNewCompanyAdminPass] = useState('');
 
-      async function carregarDados() {
+      const isSuperAdmin = currentUser?.role === 'superadmin';
+      const effectiveCompanyId = impersonatedCompany ? impersonatedCompany.company_id : currentUser?.company_id;
+
+      // Recuperar sessão salva no navegador
+      useEffect(() => {
+        const saved = localStorage.getItem('foodstrick_user');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            setCurrentUser(parsed);
+            setIsAuthenticated(true);
+            if (parsed.role === 'superadmin') {
+              setAbaAtiva('configuracoes');
+              setSubAbaConfig('empresas');
+              fetchCompanies();
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      }, []);
+
+      // Atualizar dados da cozinha ativa
+      useEffect(() => {
+        if (isAuthenticated && effectiveCompanyId && effectiveCompanyId !== 'foodstrick-master') {
+          carregarDadosOperacionais(effectiveCompanyId);
+        }
+      }, [isAuthenticated, effectiveCompanyId]);
+
+      async function carregarDadosOperacionais(compId) {
         setCarregando(true);
         try {
-          const { data: prods } = await supabaseClient.from('produtos').select('*').order('nome');
-          const { data: lancs } = await supabaseClient.from('lancamentos').select('*').order('data', { ascending: false });
+          const { data: prods } = await supabaseClient.from('produtos').select('*').eq('company_id', compId).order('nome');
+          const { data: lancs } = await supabaseClient.from('lancamentos').select('*').eq('company_id', compId).order('data', { ascending: false });
           if (prods) setProdutos(prods);
           if (lancs) setLancamentos(lancs);
-        } catch (error) {
-          console.error("Erro:", error);
+        } catch (err) {
+          console.error(err);
         }
         setCarregando(false);
       }
 
+      // --- LOGIN ---
+      const handleLogin = async (e) => {
+        e.preventDefault();
+        setAuthError('');
+        const cleanUser = username.trim().toLowerCase();
+
+        // 1. Super Admin Mestre
+        if (cleanUser === 'admin' && password === 'admin123') {
+          const superAdminObj = { username: 'admin', role: 'superadmin', company_id: 'foodstrick-master' };
+          localStorage.setItem('foodstrick_user', JSON.stringify(superAdminObj));
+          setCurrentUser(superAdminObj);
+          setIsAuthenticated(true);
+          setAbaAtiva('configuracoes');
+          setSubAbaConfig('empresas');
+          fetchCompanies();
+          return;
+        }
+
+        // 2. Cozinhas e Operadores
+        const { data: userData } = await supabaseClient
+          .from('app_users')
+          .select('*')
+          .ilike('username', cleanUser)
+          .eq('password', password)
+          .maybeSingle();
+
+        if (userData) {
+          const { data: comp } = await supabaseClient
+            .from('companies')
+            .select('*')
+            .eq('company_id', userData.company_id)
+            .maybeSingle();
+
+          if (comp && comp.status === 'bloqueado') {
+            setAuthError('Acesso suspenso: este restaurante/cozinha está temporariamente bloqueado.');
+            return;
+          }
+
+          const userObj = {
+            username: userData.username,
+            role: userData.role || 'operador',
+            company_id: userData.company_id
+          };
+
+          localStorage.setItem('foodstrick_user', JSON.stringify(userObj));
+          setCurrentUser(userObj);
+          setIsAuthenticated(true);
+          setAbaAtiva('painel');
+          return;
+        }
+
+        setAuthError('Usuário ou senha incorretos.');
+      };
+
+      const handleLogout = () => {
+        localStorage.removeItem('foodstrick_user');
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+        setImpersonatedCompany(null);
+        setUsername('');
+        setPassword('');
+        setProdutos([]);
+        setLancamentos([]);
+      };
+
+      // Cálculos Financeiros
       const lancamentosAtivos = lancamentos.filter(l => l.status !== 'excluido');
       const lancamentosExcluidos = lancamentos.filter(l => l.status === 'excluido');
 
@@ -84,11 +199,12 @@
       const totalDespesas = lancamentosAtivos.filter(l => l.tipo === 'Despesa').reduce((acc, curr) => acc + Number(curr.valor_total), 0);
       const resultadoMes = lucroProdutos - totalDespesas;
 
-      // === LANÇAMENTOS ===
+      // Gravar Lançamento
       async function handleSalvarLancamento(e) {
         e.preventDefault();
+        if (!effectiveCompanyId) return;
+
         let total = 0, custo = 0, desc = novoLancamento.descricao;
-        
         if (novoLancamento.tipo === 'Venda') {
           const prod = produtos.find(p => p.id === novoLancamento.produto_id);
           if (!prod) return alert('Selecione um produto.');
@@ -98,94 +214,221 @@
         } else {
           total = Number(novoLancamento.valor_despesa);
         }
-        
+
         const payload = {
-          data: novoLancamento.data, tipo: novoLancamento.tipo, descricao: desc,
+          company_id: effectiveCompanyId,
+          data: novoLancamento.data,
+          tipo: novoLancamento.tipo,
+          descricao: desc,
           produto_id: novoLancamento.tipo === 'Venda' ? novoLancamento.produto_id : null,
           quantidade: novoLancamento.tipo === 'Venda' ? Number(novoLancamento.quantidade) : null,
-          pagamento: novoLancamento.pagamento, canal_categoria: novoLancamento.canal_categoria,
-          valor_total: total, custo_total: custo,
+          pagamento: novoLancamento.pagamento,
+          canal_categoria: novoLancamento.canal_categoria,
+          valor_total: total,
+          custo_total: custo,
           resultado: novoLancamento.tipo === 'Venda' ? total - custo : -total,
           fornecedor: novoLancamento.tipo === 'Despesa' ? novoLancamento.fornecedor : null,
           status: 'ativo'
         };
 
         const { error } = await supabaseClient.from('lancamentos').insert([payload]);
-        if(error) alert("Erro: " + error.message);
+        if (error) alert("Erro: " + error.message);
         else {
-            carregarDados();
-            setNovoLancamento({ ...novoLancamento, descricao: '', valor_despesa: '', quantidade: 1, produto_id: '', fornecedor: '' });
+          carregarDadosOperacionais(effectiveCompanyId);
+          setNovoLancamento({ ...novoLancamento, descricao: '', valor_despesa: '', quantidade: 1, produto_id: '', fornecedor: '' });
         }
       }
 
+      // Exclusão de Lançamento
       async function confirmarExclusao() {
-        if(!modalExclusao.idLancamento) return;
-        const { error } = await supabaseClient.from('lancamentos').update({ status: 'excluido', motivo_exclusao: motivoExclusao }).eq('id', modalExclusao.idLancamento);
-        if(error) alert("Erro: " + error.message);
+        if (!modalExclusao.idLancamento) return;
+        const { error } = await supabaseClient
+          .from('lancamentos')
+          .update({ status: 'excluido', motivo_exclusao: motivoExclusao })
+          .eq('id', modalExclusao.idLancamento);
+
+        if (error) alert("Erro: " + error.message);
         else {
-          carregarDados();
+          carregarDadosOperacionais(effectiveCompanyId);
           setModalExclusao({ aberto: false, idLancamento: null });
         }
       }
 
-      // === PRODUTOS ===
+      // Gravar Produto
       async function handleSalvarProduto(e) {
         e.preventDefault();
+        if (!effectiveCompanyId) return;
+
         const payload = {
-          nome: novoProduto.nome, preco_venda: parseFloat(novoProduto.preco_venda),
-          custo_unitario: parseFloat(novoProduto.custo_unitario), observacao: novoProduto.observacao
+          company_id: effectiveCompanyId,
+          nome: novoProduto.nome,
+          preco_venda: parseFloat(novoProduto.preco_venda),
+          custo_unitario: parseFloat(novoProduto.custo_unitario),
+          observacao: novoProduto.observacao
         };
+
         const { error } = await supabaseClient.from('produtos').insert([payload]);
-        if(error) alert("Erro: " + error.message);
+        if (error) alert("Erro: " + error.message);
         else {
-            carregarDados();
-            setNovoProduto({ nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
+          carregarDadosOperacionais(effectiveCompanyId);
+          setNovoProduto({ nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
         }
       }
 
+      // Deletar Produto
       async function deletarProduto(id) {
-        // Verifica se o produto tem lançamentos vinculados a ele
         const temLancamentos = lancamentos.some(l => l.produto_id === id);
-        
         if (temLancamentos) {
-            alert("Atenção: Este produto não pode ser excluído permanentemente porque existem lançamentos de vendas associados a ele. Isso corromperia o seu histórico financeiro.");
-            setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' });
-            return;
+          alert("Atenção: Este produto possui vendas registradas e não pode ser apagado para não quebrar seu histórico financeiro.");
+          setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' });
+          return;
         }
 
         const { error } = await supabaseClient.from('produtos').delete().eq('id', id);
-        if(error) {
-            alert("Erro ao excluir produto: " + error.message);
-        } else {
-            carregarDados();
-            setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' });
+        if (error) alert("Erro: " + error.message);
+        else {
+          carregarDadosOperacionais(effectiveCompanyId);
+          setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' });
         }
       }
 
-      if(carregando && produtos.length === 0){
-          return <div className="flex items-center justify-center min-h-screen text-white">Carregando sistema...</div>
+      // Super Admin: Empresas B2B
+      const fetchCompanies = async () => {
+        const { data } = await supabaseClient.from('companies').select('*').order('created_at', { ascending: false });
+        if (data) setCompaniesList(data);
+      };
+
+      const handleCreateCompanyB2B = async (e) => {
+        e.preventDefault();
+        const cleanName = newCompanyName.trim();
+        let cleanSlug = newCompanySlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+        const cleanAdmin = newCompanyAdminUser.trim().toLowerCase();
+        const cleanPass = newCompanyAdminPass.trim();
+
+        if (!cleanSlug) {
+          cleanSlug = cleanName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-');
+        }
+
+        const { error: compError } = await supabaseClient.from('companies').insert([
+          { company_id: cleanSlug, company_name: cleanName, contact_phone: newCompanyPhone.trim(), status: 'ativo' }
+        ]);
+
+        if (compError) return alert("Erro ao criar cozinha: " + compError.message);
+
+        await supabaseClient.from('app_users').insert([
+          { username: cleanAdmin, password: cleanPass, role: 'admin', company_id: cleanSlug }
+        ]);
+
+        alert(`Restaurante/Cozinha "${cleanName}" cadastrado com sucesso!`);
+        setNewCompanyName(''); setNewCompanySlug(''); setNewCompanyPhone(''); setNewCompanyAdminUser(''); setNewCompanyAdminPass('');
+        fetchCompanies();
+      };
+
+      const handleToggleCompanyStatus = async (id, currentStatus) => {
+        const nextStatus = currentStatus === 'ativo' ? 'bloqueado' : 'ativo';
+        await supabaseClient.from('companies').update({ status: nextStatus }).eq('id', id);
+        fetchCompanies();
+      };
+
+      // ==========================
+      // TELA DE LOGIN FOODSTRICK
+      // ==========================
+      if (!isAuthenticated) {
+        return (
+          <div 
+            className="min-h-screen w-full flex items-center justify-start p-6 md:p-16 lg:p-24 relative bg-cover bg-center"
+            style={{ backgroundImage: `url("${LOGIN_BG_IMAGE}")` }}
+          >
+            <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" />
+
+            <div className="relative z-10 w-full max-w-sm bg-[#161616] rounded-2xl shadow-2xl border border-[#2d2d2d] p-8 text-white">
+              <div className="flex items-center gap-3 pb-6 border-b border-[#2d2d2d] mb-6">
+                <div className="w-12 h-12 rounded-xl bg-[#D95B1E] flex items-center justify-center text-white shadow-lg shadow-[#D95B1E]/30">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+                </div>
+                <div>
+                  <h1 className="text-2xl font-black italic tracking-wider text-white">FoodStrick</h1>
+                  <p className="text-[10px] text-zinc-400 font-semibold uppercase tracking-widest">Gestão Gastronômica</p>
+                </div>
+              </div>
+
+              {authError && (
+                <div className="mb-4 p-3 bg-red-950/60 border border-red-800 text-red-300 rounded-lg text-xs font-medium text-center">
+                  {authError}
+                </div>
+              )}
+
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">Usuário / Operador</label>
+                  <input 
+                    type="text"
+                    placeholder="admin ou seu_login"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full bg-[#202020] text-white text-sm px-4 py-2.5 rounded-lg border border-[#333] focus:border-[#D95B1E] outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="relative">
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">Senha</label>
+                  <input 
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-[#202020] text-white text-sm px-4 py-2.5 pr-10 rounded-lg border border-[#333] focus:border-[#D95B1E] outline-none"
+                    required
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-8 text-zinc-400 hover:text-white"
+                  >
+                    {showPassword ? "👁️" : "🙈"}
+                  </button>
+                </div>
+
+                <button 
+                  type="submit"
+                  className="w-full btn-orange font-bold py-3 rounded-lg text-sm tracking-wide shadow-lg transition-all mt-2"
+                >
+                  Entrar no Sistema
+                </button>
+              </form>
+
+              <div className="mt-6 text-center text-xs text-zinc-500">
+                FoodStrick • Plataforma Multi-Cozinhas v2.0
+              </div>
+            </div>
+          </div>
+        );
       }
 
+      // ==========================
+      // SISTEMA PRINCIPAL
+      // ==========================
       return (
         <div className="flex flex-col md:flex-row min-h-screen relative">
-          
+
           {/* MODAL DE EXCLUSÃO DE LANÇAMENTO */}
           {modalExclusao.aberto && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm px-4">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
               <div className="bg-[#171717] border border-[#333] rounded-xl p-6 w-full max-w-md shadow-2xl">
-                <h3 className="text-xl font-bold text-white mb-2">Excluir Lançamento</h3>
-                <p className="text-sm text-zinc-400 mb-6">Qual o motivo da exclusão deste registro? Ele será movido para a aba de Exclusões.</p>
-                <div className="space-y-3 mb-6">
+                <h3 className="text-lg font-bold text-white mb-2">Excluir Lançamento</h3>
+                <p className="text-xs text-zinc-400 mb-5">Escolha o motivo. Este item sairá do caixa ativo e irá para a Lixeira.</p>
+                <div className="space-y-2 mb-6">
                   {['Pedido cancelado', 'Erro de principiante', 'Erro técnico', 'Outro'].map(motivo => (
-                    <label key={motivo} className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${motivoExclusao === motivo ? 'border-[#D95B1E] bg-[#D95B1E]/10' : 'border-[#333] hover:bg-[#202020]'}`}>
-                      <input type="radio" name="motivo" value={motivo} checked={motivoExclusao === motivo} onChange={(e) => setMotivoExclusao(e.target.value)} className="w-4 h-4 text-[#D95B1E] bg-[#202020] border-gray-600" />
-                      <span className="ml-3 text-sm text-white font-medium">{motivo}</span>
+                    <label key={motivo} className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${motivoExclusao === motivo ? 'border-[#D95B1E] bg-[#D95B1E]/10' : 'border-[#2d2d2d] hover:bg-[#202020]'}`}>
+                      <input type="radio" name="motivo" value={motivo} checked={motivoExclusao === motivo} onChange={(e) => setMotivoExclusao(e.target.value)} className="text-[#D95B1E]" />
+                      <span className="ml-3 text-xs text-white font-medium">{motivo}</span>
                     </label>
                   ))}
                 </div>
                 <div className="flex justify-end gap-3">
-                  <button onClick={() => setModalExclusao({ aberto: false, idLancamento: null })} className="px-4 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:text-white transition-colors">Cancelar</button>
-                  <button onClick={confirmarExclusao} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">Confirmar Exclusão</button>
+                  <button onClick={() => setModalExclusao({ aberto: false, idLancamento: null })} className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white">Cancelar</button>
+                  <button onClick={confirmarExclusao} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold">Confirmar Exclusão</button>
                 </div>
               </div>
             </div>
@@ -193,130 +436,187 @@
 
           {/* MODAL DE EXCLUSÃO DE PRODUTO */}
           {modalExcluirProduto.aberto && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm px-4">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
               <div className="bg-[#171717] border border-[#333] rounded-xl p-6 w-full max-w-md shadow-2xl">
-                <h3 className="text-xl font-bold text-white mb-2">Deletar Produto</h3>
-                <p className="text-sm text-zinc-400 mb-6">
-                  Tem certeza que deseja apagar o produto <span className="text-white font-bold">"{modalExcluirProduto.nome}"</span>? <br/><br/>
-                  <span className="text-rose-400">Nota: Produtos que já possuem vendas registradas não podem ser apagados para não quebrar o histórico financeiro.</span>
+                <h3 className="text-lg font-bold text-white mb-2">Deletar Produto</h3>
+                <p className="text-xs text-zinc-400 mb-6">
+                  Deseja remover <strong className="text-white">"{modalExcluirProduto.nome}"</strong>? Produtos com histórico de vendas não podem ser apagados.
                 </p>
                 <div className="flex justify-end gap-3">
-                  <button onClick={() => setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' })} className="px-4 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:text-white transition-colors">Cancelar</button>
-                  <button onClick={() => deletarProduto(modalExcluirProduto.idProduto)} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">Deletar Produto</button>
+                  <button onClick={() => setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' })} className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white">Cancelar</button>
+                  <button onClick={() => deletarProduto(modalExcluirProduto.idProduto)} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold">Deletar Produto</button>
                 </div>
               </div>
             </div>
           )}
 
           {/* SIDEBAR PRINCIPAL */}
-          <aside className="w-full md:w-[260px] bg-[#1c1c1c] border-r border-[#2d2d2d] flex flex-col justify-between h-screen sticky top-0 overflow-y-auto shrink-0 z-20">
+          <aside className="w-full md:w-64 bg-[#141414] border-r border-[#242424] p-5 flex flex-col justify-between shrink-0 h-screen sticky top-0 overflow-y-auto">
             <div>
-              <div className="flex flex-col items-center text-center p-6 border-b border-[#2d2d2d]">
-                <div className="w-20 h-20 rounded-full border-2 border-[#D95B1E] bg-[#141414] flex items-center justify-center p-2 mb-3 shadow-lg">
-                  <div className="text-center">
-                    <span className="block text-green text-xs font-bold leading-tight uppercase">Cozinha</span>
-                    <span className="block text-orange text-xs font-black tracking-wider uppercase">Brasileira</span>
-                  </div>
+              <div className="flex items-center gap-3 pb-6 border-b border-[#242424]">
+                <div className="w-10 h-10 rounded-xl bg-[#D95B1E] flex items-center justify-center text-white shadow-md shadow-[#D95B1E]/30">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
                 </div>
-                <h1 className="text-sm font-semibold tracking-wide text-[#f2ece4]">COZINHA BRASILEIRA</h1>
+                <div>
+                  <h2 className="text-lg font-black tracking-tight text-white">FoodStrick</h2>
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-widest block font-semibold truncate max-w-[130px]">
+                    {impersonatedCompany ? impersonatedCompany.company_name : (currentUser?.company_id || 'Gestão')}
+                  </span>
+                </div>
               </div>
-              
-              <nav className="mt-4 px-3 space-y-1">
-                <button onClick={() => setAbaAtiva('painel')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${abaAtiva === 'painel' ? 'bg-[#333] text-white' : 'text-zinc-400 hover:bg-[#2a2a2a] hover:text-zinc-200'}`}>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+
+              <nav className="mt-6 space-y-1.5">
+                <button 
+                  onClick={() => setAbaAtiva('painel')}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'painel' ? 'btn-orange shadow-md' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
                   Painel Geral
                 </button>
-                <button onClick={() => setAbaAtiva('lancamentos')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${abaAtiva === 'lancamentos' ? 'bg-[#333] text-white' : 'text-zinc-400 hover:bg-[#2a2a2a] hover:text-zinc-200'}`}>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17V7"/></svg>
+                <button 
+                  onClick={() => setAbaAtiva('lancamentos')}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'lancamentos' ? 'btn-orange shadow-md' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17V7"/></svg>
                   Lançamentos
                 </button>
-                <button onClick={() => setAbaAtiva('produtos')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${abaAtiva === 'produtos' ? 'bg-[#333] text-white' : 'text-zinc-400 hover:bg-[#2a2a2a] hover:text-zinc-200'}`}>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                <button 
+                  onClick={() => setAbaAtiva('produtos')}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'produtos' ? 'btn-orange shadow-md' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
                   Produtos & Custos
                 </button>
               </nav>
             </div>
 
-            <div className="p-3 border-t border-[#2d2d2d]">
-              <button onClick={() => setAbaAtiva('configuracoes')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${abaAtiva === 'configuracoes' ? 'bg-[#D95B1E] text-white' : 'text-zinc-400 hover:bg-[#2a2a2a] hover:text-zinc-200'}`}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            <div className="pt-4 border-t border-[#242424] space-y-2">
+              <button 
+                onClick={() => setAbaAtiva('configuracoes')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'configuracoes' ? 'bg-[#262626] text-white' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
                 Configurações
+              </button>
+              <button 
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-xs font-medium text-zinc-500 hover:text-red-400 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                Sair
               </button>
             </div>
           </aside>
 
-          {/* SUB-SIDEBAR (Aparece SOMENTE quando clica em Configurações) */}
+          {/* SUB-SIDEBAR (Estilo Supabase) */}
           {abaAtiva === 'configuracoes' && (
-            <aside className="w-full md:w-[240px] bg-[#141414] border-r border-[#2d2d2d] h-screen sticky top-0 shrink-0 z-10 hidden md:block">
-              <div className="p-6 pb-2">
-                <h2 className="text-white text-lg font-bold">Settings</h2>
-              </div>
-              <div className="px-3 py-2">
-                <span className="px-3 text-[11px] font-bold text-zinc-500 tracking-wider uppercase mb-2 block">Administração</span>
+            <aside className="w-full md:w-56 bg-[#111111] border-r border-[#242424] p-5 shrink-0 hidden md:block h-screen sticky top-0 overflow-y-auto">
+              <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4">Ajustes & Gestão</h3>
+              <nav className="space-y-1">
                 <button 
-                  onClick={() => setSubAbaAtiva('exclusoes')}
-                  className={`w-full text-left px-3 py-1.5 rounded text-sm font-medium transition-colors ${subAbaAtiva === 'exclusoes' ? 'bg-[#333] text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
+                  onClick={() => setSubAbaConfig('exclusoes')}
+                  className={`w-full text-left px-3 py-2 rounded-md text-xs font-medium ${subAbaConfig === 'exclusoes' ? 'bg-[#202020] text-[#D95B1E]' : 'text-zinc-400 hover:text-white'}`}
                 >
                   Exclusões (Lixeira)
                 </button>
-              </div>
+                <button 
+                  onClick={() => setSubAbaConfig('conta')}
+                  className={`w-full text-left px-3 py-2 rounded-md text-xs font-medium ${subAbaConfig === 'conta' ? 'bg-[#202020] text-white' : 'text-zinc-400 hover:text-white'}`}
+                >
+                  Minha Conta & Unidade
+                </button>
+                {isSuperAdmin && (
+                  <button 
+                    onClick={() => { setSubAbaConfig('empresas'); fetchCompanies(); }}
+                    className={`w-full text-left px-3 py-2 rounded-md text-xs font-bold ${subAbaConfig === 'empresas' ? 'bg-blue-950/40 text-blue-400 border border-blue-900/50' : 'text-blue-400/70 hover:text-blue-300'}`}
+                  >
+                    🏢 Gestão de Cozinhas (B2B)
+                  </button>
+                )}
+              </nav>
             </aside>
           )}
 
-          {/* Conteúdo Principal */}
+          {/* CONTEÚDO */}
           <main className="flex-1 bg-[#0f0f0f] p-6 md:p-10 overflow-y-auto">
-            
+
+            {/* AVISO DO MODO SUPORTE (SUPER ADMIN DENTRO DE UMA COZINHA) */}
+            {impersonatedCompany && (
+              <div className="mb-6 p-3 bg-amber-500/15 border border-amber-500/40 rounded-xl flex items-center justify-between text-xs text-amber-300">
+                <span>
+                  <strong>[Modo Suporte Ativo]:</strong> Conectado à cozinha: <strong>{impersonatedCompany.company_name}</strong> ({impersonatedCompany.company_id})
+                </span>
+                <button 
+                  onClick={() => { setImpersonatedCompany(null); setAbaAtiva('configuracoes'); setSubAbaConfig('empresas'); }}
+                  className="bg-amber-500 hover:bg-amber-400 text-black font-bold px-3 py-1 rounded-lg text-xs"
+                >
+                  Sair do Ambiente
+                </button>
+              </div>
+            )}
+
+            {/* 1. ABA PAINEL GERAL */}
             {abaAtiva === 'painel' && (
               <div className="max-w-6xl">
-                <h2 className="text-2xl font-bold mb-6 text-white">Painel Gerencial</h2>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
-                  <div className="bg-[#1c1c1c] border border-[#2d2d2d] p-5 rounded-xl shadow-sm">
-                    <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Faturamento</span>
-                    <p className="text-2xl font-bold text-white mt-2">R$ {faturamento.toFixed(2)}</p>
+                <header className="mb-8">
+                  <h1 className="text-2xl font-bold tracking-tight text-white">Painel Operacional</h1>
+                  <p className="text-xs text-zinc-400">Resumo financeiro e margem bruta consolidada</p>
+                </header>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                  <div className="bg-[#161616] border border-[#262626] p-5 rounded-xl">
+                    <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Faturamento</span>
+                    <p className="text-2xl font-bold text-white mt-1">R$ {faturamento.toFixed(2)}</p>
+                    <span className="text-[10px] text-zinc-500">Vendas brutas totais</span>
                   </div>
-                  <div className="bg-[#1c1c1c] border border-[#2d2d2d] p-5 rounded-xl shadow-sm">
-                    <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Lucro Produtos</span>
-                    <p className="text-2xl font-bold text-green mt-2">R$ {lucroProdutos.toFixed(2)}</p>
+                  <div className="bg-[#161616] border border-[#262626] p-5 rounded-xl">
+                    <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Lucro dos Produtos</span>
+                    <p className="text-2xl font-bold text-emerald-400 mt-1">R$ {lucroProdutos.toFixed(2)}</p>
+                    <span className="text-[10px] text-zinc-500">Margem líquida sobre pratos</span>
                   </div>
-                  <div className="bg-[#1c1c1c] border border-[#2d2d2d] p-5 rounded-xl shadow-sm">
-                    <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Despesas</span>
-                    <p className="text-2xl font-bold text-red-500 mt-2">R$ {totalDespesas.toFixed(2)}</p>
+                  <div className="bg-[#161616] border border-[#262626] p-5 rounded-xl">
+                    <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Despesas</span>
+                    <p className="text-2xl font-bold text-red-500 mt-1">R$ {totalDespesas.toFixed(2)}</p>
+                    <span className="text-[10px] text-zinc-500">Custos operacionais / insumos</span>
                   </div>
-                  <div className="bg-[#1c1c1c] border border-[#2d2d2d] p-5 rounded-xl shadow-sm">
-                    <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Resultado Mês</span>
-                    <p className={`text-2xl font-bold mt-2 ${resultadoMes >= 0 ? 'text-orange' : 'text-red-500'}`}>R$ {resultadoMes.toFixed(2)}</p>
+                  <div className="bg-[#161616] border border-[#262626] p-5 rounded-xl">
+                    <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Resultado do Mês</span>
+                    <p className={`text-2xl font-bold mt-1 ${resultadoMes >= 0 ? 'text-[#D95B1E]' : 'text-red-500'}`}>
+                      R$ {resultadoMes.toFixed(2)}
+                    </p>
+                    <span className="text-[10px] text-zinc-500">Lucro final apurado</span>
                   </div>
                 </div>
-                
-                <div className="bg-[#1c1c1c] border border-[#2d2d2d] rounded-xl p-6 overflow-x-auto shadow-sm">
-                  <h3 className="text-base font-semibold mb-4 text-white">Últimos Lançamentos</h3>
-                  <table className="w-full text-left text-sm text-zinc-400">
-                    <thead className="border-b border-[#2d2d2d]">
+
+                <div className="bg-[#161616] border border-[#262626] rounded-xl p-5 overflow-x-auto shadow-sm">
+                  <h2 className="text-sm font-bold text-white mb-4">Últimos Lançamentos Registrados</h2>
+                  <table className="w-full text-left text-xs text-zinc-400">
+                    <thead className="border-b border-[#262626]">
                       <tr>
-                        <th className="pb-3 font-medium uppercase text-xs">Data</th>
-                        <th className="pb-3 font-medium uppercase text-xs">Tipo</th>
-                        <th className="pb-3 font-medium uppercase text-xs">Descrição / Item</th>
-                        <th className="pb-3 font-medium uppercase text-xs">Canal</th>
-                        <th className="pb-3 font-medium uppercase text-xs text-center">Qtd.</th>
-                        <th className="pb-3 font-medium uppercase text-xs text-right">Valor</th>
+                        <th className="pb-3 uppercase">Data</th>
+                        <th className="pb-3 uppercase">Tipo</th>
+                        <th className="pb-3 uppercase">Descrição / Item</th>
+                        <th className="pb-3 uppercase">Canal</th>
+                        <th className="pb-3 uppercase text-center">Qtd</th>
+                        <th className="pb-3 uppercase text-right">Valor Total</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#2d2d2d]">
+                    <tbody className="divide-y divide-[#262626]">
                       {lancamentosAtivos.slice(0, 10).map(l => (
-                        <tr key={l.id} className="hover:bg-[#252525] transition-colors">
+                        <tr key={l.id} className="hover:bg-[#1c1c1c]">
                           <td className="py-3">{l.data}</td>
                           <td className="py-3">
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${l.tipo === 'Venda' ? 'bg-[#4A6332]/20 text-[#71994c]' : 'bg-red-950/40 text-red-400'}`}>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${l.tipo === 'Venda' ? 'bg-emerald-950/60 text-emerald-400' : 'bg-red-950/60 text-red-400'}`}>
                               {l.tipo}
                             </span>
                           </td>
                           <td className="py-3 text-white font-medium">
-                            {l.descricao} 
-                            {l.fornecedor && <span className="text-xs font-normal text-zinc-500 block">Fornecedor: {l.fornecedor}</span>}
+                            {l.descricao}
+                            {l.fornecedor && <span className="text-[10px] text-zinc-500 block">Forn: {l.fornecedor}</span>}
                           </td>
                           <td className="py-3">{l.canal_categoria}</td>
                           <td className="py-3 text-center text-white">{l.quantidade ? l.quantidade : '-'}</td>
-                          <td className="py-3 text-right text-white font-medium">R$ {Number(l.valor_total).toFixed(2)}</td>
+                          <td className="py-3 text-right font-bold text-white">R$ {Number(l.valor_total).toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -325,108 +625,114 @@
               </div>
             )}
 
+            {/* 2. ABA LANÇAMENTOS */}
             {abaAtiva === 'lancamentos' && (
               <div className="max-w-6xl">
-                <h2 className="text-2xl font-bold mb-6 text-white">Novo Lançamento</h2>
-                
-                <form onSubmit={handleSalvarLancamento} className="bg-[#1c1c1c] border border-[#2d2d2d] p-6 rounded-xl mb-10 space-y-6 shadow-sm">
+                <header className="mb-6">
+                  <h1 className="text-2xl font-bold text-white">Novo Lançamento</h1>
+                  <p className="text-xs text-zinc-400">Lance saídas de pratos ou registre compras e custos</p>
+                </header>
+
+                <form onSubmit={handleSalvarLancamento} className="bg-[#161616] border border-[#262626] p-6 rounded-xl mb-8 space-y-4 shadow-sm">
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-zinc-400 mb-1">Tipo de Operação</label>
-                      <select value={novoLancamento.tipo} onChange={e => setNovoLancamento({...novoLancamento, tipo: e.target.value})} className="w-full bg-[#252525] border border-[#333] focus:border-[#D95B1E] focus:outline-none rounded-lg p-2.5 text-white transition-colors">
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Operação</label>
+                      <select value={novoLancamento.tipo} onChange={e => setNovoLancamento({...novoLancamento, tipo: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none focus:border-[#D95B1E]">
                         <option>Venda</option><option>Despesa</option>
                       </select>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-zinc-400 mb-1">Data</label>
-                      <input type="date" value={novoLancamento.data} onChange={e => setNovoLancamento({...novoLancamento, data: e.target.value})} className="w-full bg-[#252525] border border-[#333] focus:border-[#D95B1E] focus:outline-none rounded-lg p-2.5 text-white transition-colors" required />
+                      <input type="date" value={novoLancamento.data} onChange={e => setNovoLancamento({...novoLancamento, data: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none focus:border-[#D95B1E]" required />
                     </div>
                     
                     {novoLancamento.tipo === 'Venda' ? (
                       <div className="col-span-2">
-                        <label className="block text-xs font-medium text-zinc-400 mb-1">Produto Vendido</label>
-                        <select value={novoLancamento.produto_id} onChange={e => setNovoLancamento({...novoLancamento, produto_id: e.target.value})} className="w-full bg-[#252525] border border-[#333] focus:border-[#D95B1E] focus:outline-none rounded-lg p-2.5 text-white transition-colors" required>
-                          <option value="">Selecione o produto...</option>
-                          {produtos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                        <label className="block text-xs font-medium text-zinc-400 mb-1">Produto / Prato</label>
+                        <select value={novoLancamento.produto_id} onChange={e => setNovoLancamento({...novoLancamento, produto_id: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none focus:border-[#D95B1E]" required>
+                          <option value="">Selecione...</option>
+                          {produtos.map(p => <option key={p.id} value={p.id}>{p.nome} (R$ {Number(p.preco_venda).toFixed(2)})</option>)}
                         </select>
                       </div>
                     ) : (
                       <>
                         <div>
-                          <label className="block text-xs font-medium text-zinc-400 mb-1">Descrição da Despesa</label>
-                          <input type="text" placeholder="Ex: Embalagens" value={novoLancamento.descricao} onChange={e => setNovoLancamento({...novoLancamento, descricao: e.target.value})} className="w-full bg-[#252525] border border-[#333] focus:border-[#D95B1E] focus:outline-none rounded-lg p-2.5 text-white transition-colors" required />
+                          <label className="block text-xs font-medium text-zinc-400 mb-1">Descrição</label>
+                          <input type="text" placeholder="Ex: Carne, Embalagens..." value={novoLancamento.descricao} onChange={e => setNovoLancamento({...novoLancamento, descricao: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none focus:border-[#D95B1E]" required />
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-zinc-400 mb-1">Fornecedor (Opcional)</label>
-                          <input type="text" placeholder="Ex: Atacadão" value={novoLancamento.fornecedor} onChange={e => setNovoLancamento({...novoLancamento, fornecedor: e.target.value})} className="w-full bg-[#252525] border border-[#333] focus:border-[#D95B1E] focus:outline-none rounded-lg p-2.5 text-white transition-colors" />
+                          <input type="text" placeholder="Ex: Distribuidora Sol" value={novoLancamento.fornecedor} onChange={e => setNovoLancamento({...novoLancamento, fornecedor: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none focus:border-[#D95B1E]" />
                         </div>
                       </>
                     )}
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     {novoLancamento.tipo === 'Venda' ? (
                       <div>
                         <label className="block text-xs font-medium text-zinc-400 mb-1">Quantidade</label>
-                        <input type="number" min="1" value={novoLancamento.quantidade} onChange={e => setNovoLancamento({...novoLancamento, quantidade: e.target.value})} className="w-full bg-[#252525] border border-[#333] focus:border-[#D95B1E] focus:outline-none rounded-lg p-2.5 text-white transition-colors" required />
+                        <input type="number" min="1" value={novoLancamento.quantidade} onChange={e => setNovoLancamento({...novoLancamento, quantidade: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none focus:border-[#D95B1E]" required />
                       </div>
                     ) : (
                       <div>
                         <label className="block text-xs font-medium text-zinc-400 mb-1">Valor Total (R$)</label>
-                        <input type="number" step="0.01" value={novoLancamento.valor_despesa} onChange={e => setNovoLancamento({...novoLancamento, valor_despesa: e.target.value})} className="w-full bg-[#252525] border border-[#333] focus:border-[#D95B1E] focus:outline-none rounded-lg p-2.5 text-white transition-colors" required />
+                        <input type="number" step="0.01" value={novoLancamento.valor_despesa} onChange={e => setNovoLancamento({...novoLancamento, valor_despesa: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none focus:border-[#D95B1E]" required />
                       </div>
                     )}
                     <div>
-                      <label className="block text-xs font-medium text-zinc-400 mb-1">Forma de Pagamento</label>
-                      <select value={novoLancamento.pagamento} onChange={e => setNovoLancamento({...novoLancamento, pagamento: e.target.value})} className="w-full bg-[#252525] border border-[#333] focus:border-[#D95B1E] focus:outline-none rounded-lg p-2.5 text-white transition-colors">
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Pagamento</label>
+                      <select value={novoLancamento.pagamento} onChange={e => setNovoLancamento({...novoLancamento, pagamento: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none focus:border-[#D95B1E]">
                         <option>Pix</option><option>Cartão</option><option>Dinheiro</option><option>Transferência</option><option>Outro</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-zinc-400 mb-1">Categoria / Canal</label>
-                      <select value={novoLancamento.canal_categoria} onChange={e => setNovoLancamento({...novoLancamento, canal_categoria: e.target.value})} className="w-full bg-[#252525] border border-[#333] focus:border-[#D95B1E] focus:outline-none rounded-lg p-2.5 text-white transition-colors">
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Canal / Categoria</label>
+                      <select value={novoLancamento.canal_categoria} onChange={e => setNovoLancamento({...novoLancamento, canal_categoria: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none focus:border-[#D95B1E]">
                         <option>Delivery</option><option>Retirada</option><option>Evento</option><option>Insumos</option><option>Embalagens</option><option>Bebidas</option><option>Outros</option>
                       </select>
                     </div>
                     <div className="flex items-end">
-                      <button type="submit" className="w-full btn-orange font-semibold py-2.5 rounded-lg shadow-md transition-colors">Registrar Lançamento</button>
+                      <button type="submit" className="w-full btn-orange font-bold py-2.5 rounded-lg text-xs transition-all shadow-md">
+                        Registrar Operação
+                      </button>
                     </div>
                   </div>
                 </form>
 
-                <div className="bg-[#1c1c1c] border border-[#2d2d2d] rounded-xl p-6 overflow-x-auto shadow-sm">
-                  <h3 className="text-base font-semibold mb-4 text-white">Histórico Completo</h3>
-                  <table className="w-full text-left text-sm text-zinc-400">
-                    <thead className="border-b border-[#2d2d2d]">
+                <div className="bg-[#161616] border border-[#262626] rounded-xl p-5 overflow-x-auto shadow-sm">
+                  <h2 className="text-sm font-bold text-white mb-4">Histórico Completo</h2>
+                  <table className="w-full text-left text-xs text-zinc-400">
+                    <thead className="border-b border-[#262626]">
                       <tr>
-                        <th className="pb-3 font-medium uppercase text-xs">Data</th>
-                        <th className="pb-3 font-medium uppercase text-xs">Tipo</th>
-                        <th className="pb-3 font-medium uppercase text-xs">Descrição</th>
-                        <th className="pb-3 font-medium uppercase text-xs text-center">Qtd</th>
-                        <th className="pb-3 font-medium uppercase text-xs">Canal</th>
-                        <th className="pb-3 font-medium uppercase text-xs text-right">Valor Total</th>
-                        <th className="pb-3 font-medium uppercase text-xs text-center"></th>
+                        <th className="pb-3 uppercase">Data</th>
+                        <th className="pb-3 uppercase">Tipo</th>
+                        <th className="pb-3 uppercase">Descrição</th>
+                        <th className="pb-3 uppercase text-center">Qtd</th>
+                        <th className="pb-3 uppercase">Canal</th>
+                        <th className="pb-3 uppercase text-right">Valor</th>
+                        <th className="pb-3 uppercase text-center"></th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#2d2d2d]">
+                    <tbody className="divide-y divide-[#262626]">
                       {lancamentosAtivos.map(l => (
-                        <tr key={l.id} className="hover:bg-[#252525] transition-colors group">
+                        <tr key={l.id} className="hover:bg-[#1c1c1c] group">
                           <td className="py-3">{l.data}</td>
                           <td className="py-3">
-                             <span className={`px-2 py-0.5 rounded text-xs font-medium ${l.tipo === 'Venda' ? 'bg-[#4A6332]/20 text-[#71994c]' : 'bg-red-950/40 text-red-400'}`}>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${l.tipo === 'Venda' ? 'bg-emerald-950/60 text-emerald-400' : 'bg-red-950/60 text-red-400'}`}>
                               {l.tipo}
                             </span>
                           </td>
                           <td className="py-3 text-white font-medium">
                             {l.descricao}
-                            {l.fornecedor && <span className="text-xs font-normal text-zinc-500 block">Fornecedor: {l.fornecedor}</span>}
+                            {l.fornecedor && <span className="text-[10px] text-zinc-500 block">Forn: {l.fornecedor}</span>}
                           </td>
                           <td className="py-3 text-center text-white">{l.quantidade ? l.quantidade : '-'}</td>
                           <td className="py-3">{l.canal_categoria}</td>
-                          <td className="py-3 text-right text-white font-medium">R$ {Number(l.valor_total).toFixed(2)}</td>
+                          <td className="py-3 text-right font-bold text-white">R$ {Number(l.valor_total).toFixed(2)}</td>
                           <td className="py-3 text-center">
                             <button onClick={() => setModalExclusao({ aberto: true, idLancamento: l.id })} className="text-zinc-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all" title="Excluir Lançamento">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                              🗑️
                             </button>
                           </td>
                         </tr>
@@ -437,59 +743,64 @@
               </div>
             )}
 
+            {/* 3. ABA PRODUTOS & CARDÁPIO */}
             {abaAtiva === 'produtos' && (
               <div className="max-w-6xl">
-                <h2 className="text-2xl font-bold mb-6 text-white">Cadastro de Produtos</h2>
-                <form onSubmit={handleSalvarProduto} className="bg-[#1c1c1c] border border-[#2d2d2d] p-6 rounded-xl space-y-6 shadow-sm">
+                <header className="mb-6">
+                  <h1 className="text-2xl font-bold text-white">Cardápio & Custos de Insumos</h1>
+                  <p className="text-xs text-zinc-400">Cadastre pratos, insumos e acompanhe a margem de cada item</p>
+                </header>
+
+                <form onSubmit={handleSalvarProduto} className="bg-[#161616] border border-[#262626] p-6 rounded-xl mb-8 space-y-4 shadow-sm">
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-zinc-400 mb-1">Nome do Produto</label>
-                      <input type="text" value={novoProduto.nome} onChange={e => setNovoProduto({...novoProduto, nome: e.target.value})} className="w-full bg-[#252525] border border-[#333] focus:border-[#D95B1E] focus:outline-none rounded-lg p-2.5 text-white transition-colors" required />
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Nome do Item</label>
+                      <input type="text" placeholder="Ex: Burger Braseiro" value={novoProduto.nome} onChange={e => setNovoProduto({...novoProduto, nome: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none focus:border-[#D95B1E]" required />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-zinc-400 mb-1">Preço de Venda (R$)</label>
-                      <input type="number" step="0.01" value={novoProduto.preco_venda} onChange={e => setNovoProduto({...novoProduto, preco_venda: e.target.value})} className="w-full bg-[#252525] border border-[#333] focus:border-[#D95B1E] focus:outline-none rounded-lg p-2.5 text-white transition-colors" required />
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Preço Venda (R$)</label>
+                      <input type="number" step="0.01" value={novoProduto.preco_venda} onChange={e => setNovoProduto({...novoProduto, preco_venda: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none focus:border-[#D95B1E]" required />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-zinc-400 mb-1">Custo Unitário (R$)</label>
-                      <input type="number" step="0.01" value={novoProduto.custo_unitario} onChange={e => setNovoProduto({...novoProduto, custo_unitario: e.target.value})} className="w-full bg-[#252525] border border-[#333] focus:border-[#D95B1E] focus:outline-none rounded-lg p-2.5 text-white transition-colors" required />
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Custo Insumo (R$)</label>
+                      <input type="number" step="0.01" value={novoProduto.custo_unitario} onChange={e => setNovoProduto({...novoProduto, custo_unitario: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white outline-none focus:border-[#D95B1E]" required />
                     </div>
                     <div className="flex items-end">
-                      <button type="submit" className="w-full bg-[#4A6332] hover:bg-[#3b4f28] text-white font-semibold py-2.5 rounded-lg shadow-md transition-colors">Salvar Produto</button>
+                      <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-lg text-xs transition-all shadow-md">
+                        Salvar no Cardápio
+                      </button>
                     </div>
                   </div>
                 </form>
-                
-                 <div className="bg-[#1c1c1c] border border-[#2d2d2d] rounded-xl p-6 overflow-x-auto shadow-sm mt-6">
-                  <h3 className="text-base font-semibold mb-4 text-white">Produtos Cadastrados</h3>
-                  <table className="w-full text-left text-sm text-zinc-400">
-                    <thead className="border-b border-[#2d2d2d]">
+
+                <div className="bg-[#161616] border border-[#262626] rounded-xl p-5 overflow-x-auto shadow-sm">
+                  <h2 className="text-sm font-bold text-white mb-4">Itens Cadastrados</h2>
+                  <table className="w-full text-left text-xs text-zinc-400">
+                    <thead className="border-b border-[#262626]">
                       <tr>
-                        <th className="pb-3 font-medium uppercase text-xs">Produto</th>
-                        <th className="pb-3 font-medium uppercase text-xs">Preço Venda</th>
-                        <th className="pb-3 font-medium uppercase text-xs">Custo</th>
-                        <th className="pb-3 font-medium uppercase text-xs">Margem Bruta</th>
-                        <th className="pb-3 font-medium uppercase text-xs text-center">Ação</th>
+                        <th className="pb-3 uppercase">Item</th>
+                        <th className="pb-3 uppercase">Preço Venda</th>
+                        <th className="pb-3 uppercase">Custo</th>
+                        <th className="pb-3 uppercase">Margem Bruta (R$)</th>
+                        <th className="pb-3 uppercase">Margem (%)</th>
+                        <th className="pb-3 uppercase text-center"></th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#2d2d2d]">
+                    <tbody className="divide-y divide-[#262626]">
                       {produtos.map(p => {
                         const margem = Number(p.preco_venda) - Number(p.custo_unitario);
+                        const pct = p.preco_venda > 0 ? ((margem / p.preco_venda) * 100).toFixed(1) : 0;
                         return (
-                          <tr key={p.id} className="hover:bg-[#252525] transition-colors group">
+                          <tr key={p.id} className="hover:bg-[#1c1c1c] group">
                             <td className="py-3 text-white font-medium">{p.nome}</td>
                             <td className="py-3 text-white">R$ {Number(p.preco_venda).toFixed(2)}</td>
                             <td className="py-3">R$ {Number(p.custo_unitario).toFixed(2)}</td>
-                            <td className="py-3 font-medium text-[#4A6332]">R$ {margem.toFixed(2)}</td>
+                            <td className="py-3 font-bold text-emerald-400">R$ {margem.toFixed(2)}</td>
+                            <td className="py-3 text-zinc-300">{pct}%</td>
                             <td className="py-3 text-center">
-                                {/* BOTÃO DE DELETAR PRODUTO */}
-                                <button 
-                                  onClick={() => setModalExcluirProduto({ aberto: true, idProduto: p.id, nome: p.nome })} 
-                                  className="text-zinc-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all" 
-                                  title="Deletar Produto"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
-                                </button>
+                              <button onClick={() => setModalExcluirProduto({ aberto: true, idProduto: p.id, nome: p.nome })} className="text-zinc-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
+                                🗑️
+                              </button>
                             </td>
                           </tr>
                         );
@@ -500,51 +811,121 @@
               </div>
             )}
 
-            {/* ABA DE CONFIGURAÇÕES (LIXEIRA) */}
-            {abaAtiva === 'configuracoes' && subAbaAtiva === 'exclusoes' && (
+            {/* 4. ABA CONFIGURAÇÕES */}
+            {abaAtiva === 'configuracoes' && (
               <div className="max-w-6xl">
-                <h2 className="text-2xl font-bold mb-2 text-white">Exclusões (Lixeira)</h2>
-                <p className="text-sm text-zinc-400 mb-6">Aqui ficam registrados os lançamentos que foram excluídos do sistema para auditoria.</p>
-                
-                 <div className="bg-[#1c1c1c] border border-[#2d2d2d] rounded-xl p-6 overflow-x-auto shadow-sm">
-                  <h3 className="text-base font-semibold mb-4 text-rose-500 flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
-                    Histórico de Lançamentos Excluídos
-                  </h3>
+                {/* SUB-ABA: LIXEIRA */}
+                {subAbaConfig === 'exclusoes' && (
+                  <div>
+                    <h1 className="text-2xl font-bold text-white mb-1">Lixeira & Auditoria de Exclusões</h1>
+                    <p className="text-xs text-zinc-400 mb-6">Histórico seguro dos lançamentos que foram cancelados no caixa.</p>
 
-                  {lancamentosExcluidos.length === 0 ? (
-                    <p className="text-zinc-500 text-sm italic">Nenhum lançamento excluído até o momento.</p>
-                  ) : (
-                    <table className="w-full text-left text-sm text-zinc-400">
-                      <thead className="border-b border-[#2d2d2d]">
-                        <tr>
-                          <th className="pb-3 font-medium uppercase text-xs">Data</th>
-                          <th className="pb-3 font-medium uppercase text-xs">Tipo</th>
-                          <th className="pb-3 font-medium uppercase text-xs">Descrição</th>
-                          <th className="pb-3 font-medium uppercase text-xs text-right">Valor</th>
-                          <th className="pb-3 font-medium uppercase text-xs text-rose-400 pl-4">Motivo do Cancelamento</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#2d2d2d]">
-                        {lancamentosExcluidos.map(l => (
-                          <tr key={l.id} className="hover:bg-[#252525] transition-colors">
-                            <td className="py-3">{l.data}</td>
-                            <td className="py-3">
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium bg-zinc-800 text-zinc-300`}>
-                                {l.tipo}
-                              </span>
-                            </td>
-                            <td className="py-3 text-zinc-300 font-medium line-through decoration-zinc-600">
-                              {l.descricao}
-                            </td>
-                            <td className="py-3 text-right text-zinc-300 font-medium line-through decoration-zinc-600">R$ {Number(l.valor_total).toFixed(2)}</td>
-                            <td className="py-3 text-rose-400 font-semibold pl-4">{l.motivo_exclusao || 'Não informado'}</td>
-                          </tr>
+                    <div className="bg-[#161616] border border-[#262626] rounded-xl p-5 overflow-x-auto">
+                      {lancamentosExcluidos.length === 0 ? (
+                        <p className="text-zinc-500 text-xs italic">Nenhum lançamento cancelado até o momento.</p>
+                      ) : (
+                        <table className="w-full text-left text-xs text-zinc-400">
+                          <thead className="border-b border-[#262626]">
+                            <tr>
+                              <th className="pb-3 uppercase">Data</th>
+                              <th className="pb-3 uppercase">Tipo</th>
+                              <th className="pb-3 uppercase">Descrição</th>
+                              <th className="pb-3 uppercase text-right">Valor</th>
+                              <th className="pb-3 uppercase text-red-400 pl-4">Motivo do Cancelamento</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#262626]">
+                            {lancamentosExcluidos.map(l => (
+                              <tr key={l.id} className="hover:bg-[#1c1c1c]">
+                                <td className="py-3">{l.data}</td>
+                                <td className="py-3">{l.tipo}</td>
+                                <td className="py-3 text-zinc-400 line-through">{l.descricao}</td>
+                                <td className="py-3 text-right text-zinc-400 line-through">R$ {Number(l.valor_total).toFixed(2)}</td>
+                                <td className="py-3 text-red-400 font-bold pl-4">{l.motivo_exclusao}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* SUB-ABA: EMPRESAS B2B (SUPER ADMIN ONLY) */}
+                {subAbaConfig === 'empresas' && isSuperAdmin && (
+                  <div>
+                    <h1 className="text-2xl font-bold text-white mb-1">Gestão Central de Cozinhas & Clientes</h1>
+                    <p className="text-xs text-zinc-400 mb-6">Cadastre novas operações ou acesse o ambiente de cada cliente.</p>
+
+                    <form onSubmit={handleCreateCompanyB2B} className="bg-[#161616] border border-[#262626] p-6 rounded-xl mb-8 space-y-4">
+                      <h2 className="text-xs font-bold text-blue-400 uppercase tracking-wider">
+                        Cadastrar Nova Cozinha / Restaurante
+                      </h2>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <input type="text" placeholder="Nome Fantasia (Ex: Cozinha Brasileira)" value={newCompanyName} onChange={e => setNewCompanyName(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white" required />
+                        <input type="text" placeholder="ID Único / Slug (Ex: cozinha-brasileira)" value={newCompanySlug} onChange={e => setNewCompanySlug(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white font-mono" />
+                        <input type="text" placeholder="Telefone / WhatsApp" value={newCompanyPhone} onChange={e => setNewCompanyPhone(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white" />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input type="text" placeholder="Login do Gerente" value={newCompanyAdminUser} onChange={e => setNewCompanyAdminUser(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white" required />
+                        <input type="password" placeholder="Senha Inicial (min. 4 dígitos)" value={newCompanyAdminPass} onChange={e => setNewCompanyAdminPass(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-xs text-white" required />
+                      </div>
+                      <div className="text-right">
+                        <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2 rounded-lg text-xs">
+                          Ativar Nova Cozinha
+                        </button>
+                      </div>
+                    </form>
+
+                    <div className="bg-[#161616] border border-[#262626] rounded-xl p-5">
+                      <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4">Cozinhas Ativas ({companiesList.length})</h2>
+                      <div className="space-y-2">
+                        {companiesList.map(comp => (
+                          <div key={comp.id} className="bg-[#202020] p-3.5 rounded-lg border border-[#2d2d2d] flex justify-between items-center">
+                            <div>
+                              <p className="text-sm font-bold text-white flex items-center gap-2">
+                                {comp.company_name}
+                                <span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase ${comp.status === 'ativo' ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}`}>
+                                  {comp.status}
+                                </span>
+                              </p>
+                              <p className="text-[11px] text-zinc-500 font-mono mt-0.5">ID: {comp.company_id} | Tel: {comp.contact_phone || '-'}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => { setImpersonatedCompany(comp); setAbaAtiva('painel'); }} className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5">
+                                Acessar Painel ↗
+                              </button>
+                              <button onClick={() => handleToggleCompanyStatus(comp.id, comp.status)} className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg text-xs font-medium">
+                                {comp.status === 'ativo' ? 'Bloquear' : 'Reativar'}
+                              </button>
+                            </div>
+                          </div>
                         ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* SUB-ABA: CONTA */}
+                {subAbaConfig === 'conta' && (
+                  <div className="bg-[#161616] border border-[#262626] p-6 rounded-xl max-w-xl">
+                    <h1 className="text-base font-bold text-white mb-4">Informações da Sessão</h1>
+                    <div className="space-y-2 text-xs text-zinc-300">
+                      <div className="flex justify-between py-2 border-b border-[#242424]">
+                        <span className="text-zinc-500">Usuário Conectado:</span>
+                        <span className="font-bold text-white">{currentUser?.username}</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-[#242424]">
+                        <span className="text-zinc-500">Nível de Acesso:</span>
+                        <span className="text-amber-400 font-bold uppercase">{currentUser?.role}</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-[#242424]">
+                        <span className="text-zinc-500">Identificador da Cozinha:</span>
+                        <span className="font-mono text-blue-400">{currentUser?.company_id}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
