@@ -313,6 +313,97 @@
     // ==========================================
     // APLICAÇÃO PRINCIPAL (APP)
     // ==========================================
+
+    // Editor de enquadramento: exporta somente a área visível do banner.
+    function CoverCropEditor({ imageSrc, onApply, onCancel }) {
+      const canvasRef = useRef(null);
+      const imageRef = useRef(null);
+      const dragRef = useRef(null);
+      const [ready, setReady] = useState(false);
+      const [zoom, setZoom] = useState(1);
+      const [position, setPosition] = useState({ x: 50, y: 50 });
+      const [loadError, setLoadError] = useState(false);
+      const WIDTH = 1200, HEIGHT = 360;
+
+      useEffect(() => {
+        setReady(false);
+        setLoadError(false);
+        const image = new Image();
+        image.onload = () => { imageRef.current = image; setReady(true); };
+        image.onerror = () => setLoadError(true);
+        image.src = imageSrc;
+      }, [imageSrc]);
+
+      function cropGeometry(img, z) {
+        const ratio = WIDTH / HEIGHT;
+        const baseW = Math.min(img.width, img.height * ratio);
+        const baseH = baseW / ratio;
+        return { cropW: baseW / z, cropH: baseH / z };
+      }
+
+      useEffect(() => {
+        if (!ready || !canvasRef.current || !imageRef.current) return;
+        const img = imageRef.current;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        const { cropW, cropH } = cropGeometry(img, zoom);
+        const left = (img.width - cropW) * position.x / 100;
+        const top = (img.height - cropH) * position.y / 100;
+        ctx.clearRect(0, 0, WIDTH, HEIGHT);
+        ctx.drawImage(img, left, top, cropW, cropH, 0, 0, WIDTH, HEIGHT);
+      }, [ready, zoom, position]);
+
+      function startDrag(e) {
+        if (!ready) return;
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        dragRef.current = { x: e.clientX, y: e.clientY, position };
+      }
+      function moveDrag(e) {
+        if (!dragRef.current || !imageRef.current) return;
+        const rect = canvasRef.current.getBoundingClientRect();
+        const { cropW, cropH } = cropGeometry(imageRef.current, zoom);
+        const maxX = imageRef.current.width - cropW;
+        const maxY = imageRef.current.height - cropH;
+        const dx = (e.clientX - dragRef.current.x) * cropW / rect.width;
+        const dy = (e.clientY - dragRef.current.y) * cropH / rect.height;
+        const clamp = v => Math.max(0, Math.min(100, v));
+        setPosition({
+          x: maxX > 0.01 ? clamp(dragRef.current.position.x - dx / maxX * 100) : 50,
+          y: maxY > 0.01 ? clamp(dragRef.current.position.y - dy / maxY * 100) : 50
+        });
+      }
+      function applyCrop() {
+        if (!ready || !canvasRef.current) return;
+        onApply(canvasRef.current.toDataURL('image/jpeg', 0.82));
+      }
+      return (
+        <div className="fixed inset-0 z-[10000] bg-black/85 flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Editar enquadramento da capa">
+          <div className="w-full max-w-4xl bg-[#191919] border border-[#383838] rounded-2xl shadow-2xl p-4 sm:p-6 space-y-4 max-h-[95vh] overflow-y-auto">
+            <div className="flex items-center justify-between gap-3">
+              <div><h3 className="text-lg font-bold text-white">Ajustar imagem de capa</h3><p className="text-xs text-zinc-400 mt-1">Arraste a imagem para escolher a parte que aparece no banner.</p></div>
+              <button type="button" onClick={onCancel} aria-label="Fechar editor" className="text-zinc-300 hover:text-white border border-[#444] rounded-lg px-3 py-2">Fechar</button>
+            </div>
+            <div className="relative rounded-xl overflow-hidden border border-[#444] bg-[#0c0c0c]">
+              <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="block w-full h-auto cursor-grab active:cursor-grabbing touch-none" style={{aspectRatio:'10 / 3'}} onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={() => dragRef.current = null} onPointerCancel={() => dragRef.current = null} />
+              {!ready && <div className="absolute inset-0 flex items-center justify-center text-sm text-zinc-300">{loadError ? 'Não foi possível abrir a imagem.' : 'Preparando imagem...'}</div>}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <label className="block text-xs text-zinc-300">Zoom: {Math.round(zoom * 100)}%<input className="block w-full mt-2 accent-orange-600" type="range" min="1" max="3" step="0.05" value={zoom} onChange={e => setZoom(Number(e.target.value))}/></label>
+              <label className="block text-xs text-zinc-300">Posição horizontal<input className="block w-full mt-2 accent-orange-600" type="range" min="0" max="100" value={position.x} onChange={e => setPosition(p => ({...p,x:Number(e.target.value)}))}/></label>
+              <label className="block text-xs text-zinc-300">Posição vertical<input className="block w-full mt-2 accent-orange-600" type="range" min="0" max="100" value={position.y} onChange={e => setPosition(p => ({...p,y:Number(e.target.value)}))}/></label>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button type="button" onClick={() => {setZoom(1);setPosition({x:50,y:50});}} className="border border-[#444] rounded-lg px-4 py-2 text-sm text-white">Redefinir</button>
+              <button type="button" onClick={onCancel} className="border border-[#444] rounded-lg px-4 py-2 text-sm text-white">Cancelar</button>
+              <button type="button" disabled={!ready} onClick={applyCrop} className="bg-[#D95B1E] disabled:opacity-50 rounded-lg px-5 py-2 text-sm font-bold text-white">Aplicar enquadramento</button>
+            </div>
+            <p className="text-xs text-zinc-500">Após aplicar, clique em Salvar configurações no painel para publicar a capa.</p>
+          </div>
+        </div>
+      );
+    }
+
     function App() {
       const [currentUser, setCurrentUser] = useState(() => {
         try {
@@ -376,6 +467,7 @@
       // Cardápio Online: dados separados por estabelecimento
       const [menuSettings, setMenuSettings] = useState({ menu_enabled: true, menu_slug: '', menu_description: '', menu_accent_color: '#D95B1E', menu_cover_image: '', menu_allow_delivery: true, menu_allow_pickup: true, menu_payment_methods: ['Pix', 'Dinheiro', 'Cartão'] });
       const [menuProductForm, setMenuProductForm] = useState({ id: null, nome: '', preco_venda: '', custo_unitario: '0', menu_description: '', menu_ingredients: '', menu_category: 'Pratos', menu_image_url: '', menu_available: true });
+      const [coverEditorSource, setCoverEditorSource] = useState(null);
       const [menuSaving, setMenuSaving] = useState(false);
       const [menuLoaded, setMenuLoaded] = useState(false);
       const [menuSettingsError, setMenuSettingsError] = useState('');
@@ -678,20 +770,7 @@
         if (!file.type.startsWith('image/')) { alert('Escolha uma imagem válida.'); e.target.value = ''; return; }
         if (file.size > 8 * 1024 * 1024) { alert('A imagem deve ter até 8 MB.'); e.target.value = ''; return; }
         const reader = new FileReader();
-        reader.onload = event => {
-          const img = new Image();
-          img.onload = () => {
-            const maxWidth = 1400, maxHeight = 700;
-            const scale = Math.min(1, maxWidth / img.width, maxHeight / img.height);
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.max(1, Math.round(img.width * scale));
-            canvas.height = Math.max(1, Math.round(img.height * scale));
-            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-            setMenuSettings(v => ({...v, menu_cover_image: canvas.toDataURL('image/jpeg', 0.7)}));
-          };
-          img.onerror = () => alert('Não foi possível abrir a imagem.');
-          img.src = event.target.result;
-        };
+        reader.onload = event => setCoverEditorSource(event.target.result);
         reader.onerror = () => alert('Não foi possível carregar o arquivo.');
         reader.readAsDataURL(file);
         e.target.value = '';
@@ -1106,6 +1185,7 @@
       // SISTEMA PRINCIPAL
       return (
         <div className="flex flex-col md:flex-row min-h-screen relative">
+          {coverEditorSource && <CoverCropEditor imageSrc={coverEditorSource} onCancel={() => setCoverEditorSource(null)} onApply={result => { setMenuSettings(v => ({...v,menu_cover_image:result})); setCoverEditorSource(null); }} />}
           
           {/* HEADER MOBILE */}
           <header className="md:hidden sticky top-0 z-40 bg-[#141414] border-b border-[#242424] px-4 py-3 flex items-center justify-between">
@@ -1775,7 +1855,7 @@
                   <div className="rounded-xl border border-[#333] bg-[#1c1c1c] p-4 space-y-3">
                     <div><h3 className="font-bold text-sm text-white">Imagem de capa do cardápio</h3><p className="text-xs text-zinc-400 mt-1">Personalize o banner superior do cardápio público. Prefira uma imagem horizontal, com espaço livre para o título.</p></div>
                     <input type="file" accept="image/*" onChange={handleMenuCoverUpload} className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 text-xs text-zinc-300 file:mr-3 file:rounded-md file:border-0 file:bg-[#D95B1E] file:px-3 file:py-2 file:font-bold file:text-white"/>
-                    {menuSettings.menu_cover_image && <><div className="relative overflow-hidden rounded-xl h-40 bg-[#111] border border-[#333]"><img src={menuSettings.menu_cover_image} alt="Prévia da capa do cardápio" className="w-full h-full object-cover"/><div className="absolute inset-0 bg-gradient-to-r from-black/80 to-black/20"/><span className="absolute bottom-4 left-4 text-white font-bold">Prévia da capa</span></div><button type="button" onClick={()=>setMenuSettings(v=>({...v,menu_cover_image:''}))} className="text-xs border border-[#444] rounded-lg px-3 py-2 text-zinc-200 hover:bg-[#292929]">Remover imagem de capa</button></>}
+                    {menuSettings.menu_cover_image && <><button type="button" title="Clique para editar o enquadramento" onClick={()=>setCoverEditorSource(menuSettings.menu_cover_image)} className="relative block w-full overflow-hidden rounded-xl bg-[#111] border border-[#333] text-left group"><img src={menuSettings.menu_cover_image} alt="Prévia da capa do cardápio" className="w-full aspect-[10/3] object-cover"/><div className="absolute inset-0 bg-gradient-to-r from-black/80 to-black/20"/><span className="absolute bottom-4 left-4 text-white font-bold">Prévia da capa — clique para ajustar</span><span className="absolute top-3 right-3 bg-black/70 rounded-md px-3 py-2 text-xs text-white group-hover:bg-[#D95B1E]">Editar enquadramento</span></button><button type="button" onClick={()=>setMenuSettings(v=>({...v,menu_cover_image:''}))} className="text-xs border border-[#444] rounded-lg px-3 py-2 text-zinc-200 hover:bg-[#292929]">Remover imagem de capa</button></>}
                     <p className="text-xs text-zinc-500">Depois de escolher, clique em Salvar configurações para publicar a imagem.</p>
                   </div>
                   <div className="flex flex-wrap gap-5 text-sm text-zinc-300"><label className="flex items-center gap-2"><input type="checkbox" checked={!!menuSettings.menu_allow_delivery} onChange={e=>setMenuSettings(v=>({...v,menu_allow_delivery:e.target.checked}))} className="accent-orange-600"/> Entrega</label><label className="flex items-center gap-2"><input type="checkbox" checked={!!menuSettings.menu_allow_pickup} onChange={e=>setMenuSettings(v=>({...v,menu_allow_pickup:e.target.checked}))} className="accent-orange-600"/> Retirada</label></div>
