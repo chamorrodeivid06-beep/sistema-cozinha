@@ -1,0 +1,456 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f0f0f">
+  <title>Cardápio | FoodStrick</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    :root {
+      --accent: #D95B1E;
+    }
+
+    body {
+      background: #0f0f0f;
+      color: #f5f5f5;
+      font-family: system-ui, sans-serif;
+    }
+
+    .accent {
+      background: var(--accent);
+    }
+
+    .line {
+      border-color: #303030;
+    }
+
+    input, select, textarea, button {
+      font: inherit;
+    }
+
+    button:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+
+<body>
+  <main id="app" class="max-w-3xl mx-auto min-h-screen p-4 sm:p-8">
+    <p class="text-zinc-400">Carregando cardápio...</p>
+  </main>
+
+  <script>
+    // CONEXÃO COM O SUPABASE
+    const SUPABASE_URL =
+      'https://ddngvelrtqmfgaeqsjem.supabase.co';
+
+    const SUPABASE_KEY =
+      'sb_publishable_EhLCuypZr6vHrSKDCrHxQg_n7BvKxBU';
+
+    const sb = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_KEY
+    );
+
+    // O link deve conter ?slug=SEU_SLUG
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get('slug');
+
+    const app = document.getElementById('app');
+
+    let menu = null;
+    let products = [];
+    let cart = {};
+
+    const money = value =>
+      Number(value || 0).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      });
+
+    const esc = value =>
+      String(value ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[char]));
+
+    async function callRpc(name, payload = {}) {
+      const { data, error } = await sb.rpc(name, payload);
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    }
+
+    function render() {
+      if (!menu) {
+        throw new Error('Não foi possível carregar o cardápio.');
+      }
+
+      document.documentElement.style.setProperty(
+        '--accent',
+        menu.accent_color || '#D95B1E'
+      );
+
+      const total = products.reduce((sum, product) => {
+        return sum +
+          Number(cart[product.id] || 0) *
+          Number(product.price || 0);
+      }, 0);
+
+      const orderTypes = [];
+
+      if (menu.allow_delivery) {
+        orderTypes.push(
+          '<option value="delivery">Entrega</option>'
+        );
+      }
+
+      if (menu.allow_pickup) {
+        orderTypes.push(
+          '<option value="pickup">Retirada no local</option>'
+        );
+      }
+
+      const payments = (menu.payment_methods || [
+        'Pix',
+        'Dinheiro',
+        'Cartão'
+      ]).map(method =>
+        `<option value="${esc(method)}">${esc(method)}</option>`
+      ).join('');
+
+      app.innerHTML = `
+        <header class="mb-8 border-b line pb-6">
+          <div class="inline-flex rounded-xl accent p-3 mb-4 font-black">
+            FS
+          </div>
+
+          <h1 class="text-3xl sm:text-4xl font-black">
+            ${esc(menu.name || 'Cardápio FoodStrick')}
+          </h1>
+
+          <p class="text-zinc-400 mt-2">
+            ${esc(menu.description || 'Escolha seus itens favoritos.')}
+          </p>
+        </header>
+
+        <section class="space-y-3">
+          <h2 class="text-xl font-bold mb-4">Nosso cardápio</h2>
+
+          ${products.map(product => `
+            <article class="border line rounded-xl p-4 flex gap-4 items-center">
+              <div class="flex-1 min-w-0">
+                <h3 class="font-bold break-words">
+                  ${esc(product.name)}
+                </h3>
+
+                <p class="font-bold mt-2">
+                  ${money(product.price)}
+                </p>
+              </div>
+
+              <div class="flex items-center gap-3">
+                <button
+                  type="button"
+                  data-dec="${esc(product.id)}"
+                  aria-label="Diminuir quantidade"
+                  class="border line rounded-lg w-10 h-10"
+                >−</button>
+
+                <span class="w-5 text-center">
+                  ${Number(cart[product.id] || 0)}
+                </span>
+
+                <button
+                  type="button"
+                  data-inc="${esc(product.id)}"
+                  aria-label="Aumentar quantidade"
+                  class="accent rounded-lg w-10 h-10"
+                >+</button>
+              </div>
+            </article>
+          `).join('')}
+        </section>
+
+        <form
+          id="orderForm"
+          class="mt-8 border line rounded-2xl p-5 space-y-4"
+        >
+          <h2 class="text-xl font-bold">Finalize seu pedido</h2>
+
+          <div class="grid sm:grid-cols-2 gap-3">
+            <input
+              name="customer_name"
+              required
+              maxlength="120"
+              autocomplete="name"
+              placeholder="Seu nome"
+              class="w-full bg-[#202020] border line rounded-lg p-3"
+            >
+
+            <input
+              name="customer_phone"
+              required
+              maxlength="40"
+              autocomplete="tel"
+              placeholder="Telefone / WhatsApp"
+              class="w-full bg-[#202020] border line rounded-lg p-3"
+            >
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-3">
+            <select
+              name="order_type"
+              id="orderType"
+              required
+              class="w-full bg-[#202020] border line rounded-lg p-3"
+            >
+              ${orderTypes.join('')}
+            </select>
+
+            <select
+              name="payment_method"
+              required
+              class="w-full bg-[#202020] border line rounded-lg p-3"
+            >
+              ${payments}
+            </select>
+          </div>
+
+          <input
+            name="delivery_address"
+            id="address"
+            maxlength="400"
+            autocomplete="street-address"
+            placeholder="Endereço para entrega"
+            class="w-full bg-[#202020] border line rounded-lg p-3"
+          >
+
+          <textarea
+            name="notes"
+            maxlength="500"
+            placeholder="Observações (opcional)"
+            class="w-full bg-[#202020] border line rounded-lg p-3"
+          ></textarea>
+
+          <div class="flex justify-between text-lg font-black">
+            <span>Total</span>
+            <span id="orderTotal">${money(total)}</span>
+          </div>
+
+          <button
+            type="submit"
+            class="accent w-full rounded-xl p-4 font-bold"
+          >
+            Enviar pedido
+          </button>
+
+          <p id="feedback" role="status" class="text-sm text-zinc-400"></p>
+        </form>
+      `;
+
+      // Adicionar e remover itens
+      app.querySelectorAll('[data-inc]').forEach(button => {
+        button.onclick = () => {
+          const id = button.dataset.inc;
+
+          cart[id] = Math.min(
+            99,
+            Number(cart[id] || 0) + 1
+          );
+
+          render();
+        };
+      });
+
+      app.querySelectorAll('[data-dec]').forEach(button => {
+        button.onclick = () => {
+          const id = button.dataset.dec;
+
+          cart[id] = Math.max(
+            0,
+            Number(cart[id] || 0) - 1
+          );
+
+          render();
+        };
+      });
+
+      // Exibir endereço somente para entrega
+      const typeSelect = app.querySelector('#orderType');
+      const address = app.querySelector('#address');
+
+      function updateAddress() {
+        const delivery = typeSelect.value === 'delivery';
+
+        address.style.display = delivery ? 'block' : 'none';
+        address.required = delivery;
+      }
+
+      typeSelect.onchange = updateAddress;
+      updateAddress();
+
+      // Enviar pedido ao Supabase
+      app.querySelector('#orderForm').onsubmit = async event => {
+        event.preventDefault();
+
+        const formElement = event.currentTarget;
+        const feedback = app.querySelector('#feedback');
+        const button = formElement.querySelector(
+          'button[type="submit"]'
+        );
+
+        const form = new FormData(formElement);
+
+        const items = products
+          .filter(product => Number(cart[product.id] || 0) > 0)
+          .map(product => ({
+            product_id: product.id,
+            quantity: Number(cart[product.id])
+          }));
+
+        if (items.length === 0) {
+          feedback.textContent =
+            'Adicione pelo menos um item ao pedido.';
+          return;
+        }
+
+        button.disabled = true;
+        button.textContent = 'Enviando pedido...';
+        feedback.textContent = '';
+
+        try {
+          const result = await callRpc(
+            'foodstrick_create_order',
+            {
+              p_slug: slug,
+              p_customer_name: form.get('customer_name'),
+              p_customer_phone: form.get('customer_phone'),
+              p_order_type: form.get('order_type'),
+              p_delivery_address: form.get('delivery_address'),
+              p_payment_method: form.get('payment_method'),
+              p_notes: form.get('notes'),
+              p_items: items
+            }
+          );
+
+          if (!result || result.success !== true) {
+            throw new Error(
+              result?.message || 'Não foi possível registrar o pedido.'
+            );
+          }
+
+          app.innerHTML = `
+            <section class="min-h-[70vh] flex flex-col items-center justify-center text-center">
+              <div class="accent rounded-full w-16 h-16 flex items-center justify-center text-3xl mb-5">
+                ✓
+              </div>
+
+              <h1 class="text-3xl font-black">
+                Pedido enviado!
+              </h1>
+
+              <p class="text-zinc-400 mt-3">
+                Seu pedido foi registrado com sucesso.
+              </p>
+
+              <p class="mt-4">
+                Número do pedido:
+                <strong class="break-all">${esc(result.order_id)}</strong>
+              </p>
+
+              <p class="mt-3 text-xl">
+                Total:
+                <strong>${money(result.total)}</strong>
+              </p>
+
+              <p class="text-sm text-zinc-500 mt-5">
+                Aguarde a confirmação do estabelecimento.
+              </p>
+            </section>
+          `;
+        } catch (error) {
+          console.error('Erro ao enviar pedido:', error);
+
+          feedback.textContent =
+            error.message || 'Erro ao enviar pedido. Tente novamente.';
+
+          button.disabled = false;
+          button.textContent = 'Tentar novamente';
+        }
+      };
+    }
+
+    // Carregar o cardápio público
+    async function loadMenu() {
+      try {
+        if (!slug) {
+          throw new Error(
+            'Falta o slug do cardápio. Acesse a página com ?slug=SEU_SLUG.'
+          );
+        }
+
+        const result = await callRpc(
+          'foodstrick_public_menu',
+          { p_slug: slug }
+        );
+
+        if (!result || !result.menu) {
+          throw new Error(
+            'Cardápio não encontrado ou desativado.'
+          );
+        }
+
+        menu = result.menu;
+        products = Array.isArray(result.products)
+          ? result.products
+          : [];
+
+        if (products.length === 0) {
+          app.innerHTML = `
+            <section class="py-20 text-center">
+              <h1 class="text-2xl font-bold">
+                Nenhum produto disponível
+              </h1>
+              <p class="text-zinc-400 mt-3">
+                Este cardápio ainda não possui produtos cadastrados.
+              </p>
+            </section>
+          `;
+          return;
+        }
+
+        render();
+      } catch (error) {
+        console.error('Erro ao carregar cardápio:', error);
+
+        app.innerHTML = `
+          <section class="py-20 text-center">
+            <h1 class="text-2xl font-bold">
+              Cardápio indisponível
+            </h1>
+
+            <p class="text-zinc-400 mt-3">
+              ${esc(error.message || 'Tente novamente mais tarde.')}
+            </p>
+          </section>
+        `;
+      }
+    }
+
+    loadMenu();
+  </script>
+</body>
+</html>
