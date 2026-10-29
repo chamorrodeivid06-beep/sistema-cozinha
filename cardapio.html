@@ -1,52 +1,2084 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Cardápio | FoodStrick</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>FoodStrick | Gestão Master</title>
+  
+  <!-- FAVICON OFICIAL FOODSTRICK -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%228%22%20fill%3D%22%23D95B1E%22/%3E%3Cg%20transform%3D%22translate%284%2C%204%29%22%3E%3Cpath%20d%3D%22M8.5%2014.5A2.5%202.5%200%200%200%2011%2012c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054%202-6%20.5%202.5%202%204.9%204%206.5%202%201.6%203%203.5%203%205.5a7%207%200%201%201-14%200c0-1.153.433-2.294%201-3a2.5%202.5%200%200%200%202.5%202.5z%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/g%3E%3C/svg%3E">
+  
+  <!-- BIBLIOTECAS DE PRODUÇÃO -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
-:root{--accent:#D95B1E}*{box-sizing:border-box}body{background:#0c0c0d;color:#fafafa;font-family:system-ui,-apple-system,sans-serif}.accent{background:var(--accent)}.line{border-color:#29292c}.hero{background:radial-gradient(ellipse at 90% 0%,color-mix(in srgb,var(--accent) 19%,transparent),transparent 60%),linear-gradient(135deg,#1b1b1d,#111113);border:1px solid #2b2b2d}.food-card{background:#18181a;border:1px solid #303034;transition:border-color .2s,transform .2s}.food-card:hover{border-color:var(--accent);transform:translateY(-2px)}.food-image{aspect-ratio:4/3;width:100%;object-fit:cover;background:#27272a}.price{color:#ffae74}.qty-btn{width:38px;height:38px;border-radius:12px;font-weight:800}.pill{border:1px solid #3f3f46;background:#222225}.order-box{background:#18181a;border:1px solid #303034}input,select,textarea{color-scheme:dark}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}@media(prefers-reduced-motion:reduce){.food-card{transition:none}}
-</style>
+    body { 
+      background-color: #0f0f0f; 
+      color: #f5f5f5; 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .btn-orange { background-color: #D95B1E; color: white; }
+    .btn-orange:hover { background-color: #c34e17; }
+    
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+    @keyframes pulseLogo {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.08); opacity: 0.8; }
+    }
+    .splash-pulse {
+      animation: pulseLogo 1.6s ease-in-out infinite;
+    }
+  </style>
 </head>
 <body>
-  <main id="app" class="max-w-6xl mx-auto min-h-screen p-4 sm:p-8"><p class="text-zinc-400">Carregando cardápio...</p></main>
-  <script>
+  <!-- TELA INICIAL INSTANTÂNEA -->
+  <div id="root">
+    <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f0f0f; color: #fff;">
+      <div class="splash-pulse" style="width: 56px; height: 56px; border-radius: 16px; background-color: #D95B1E; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 25px rgba(217,91,30,0.35); margin-bottom: 16px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+      </div>
+      <h2 style="font-size: 16px; font-weight: 800; letter-spacing: 0.5px; margin: 0; color: #ffffff;">FoodStrick</h2>
+      <span style="font-size: 11px; color: #71717a; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px;">A carregar dados...</span>
+    </div>
+  </div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+    
     const SUPABASE_URL = 'https://ddngvelrtqmfgaeqsjem.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_EhLCuypZr6vHrSKDCrHxQg_n7BvKxBU';
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    const slug = new URLSearchParams(location.search).get('slug') || location.pathname.split('/').filter(Boolean).pop();
-    const app = document.getElementById('app');
-    let menu = null, products = [], cart = {};
-    const money = v => Number(v || 0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    async function callRpc(name, payload={}) { const {data,error}=await sb.rpc(name,payload); if(error) throw error; return data; }
-    function render() {
-      document.documentElement.style.setProperty('--accent', menu.accent_color || '#D95B1E');
-      const visibleProducts = products.filter(p => p.available !== false && p.menu_available !== false);
-      const selected = visibleProducts.filter(p=>Number(cart[p.id]||0)>0);
-      const total = selected.reduce((sum,p)=>sum+Number(cart[p.id])*Number(p.price??p.preco_venda??0),0);
-      const count = selected.reduce((sum,p)=>sum+Number(cart[p.id]),0);
-      const categories = [...new Set(visibleProducts.map(p => p.category || p.menu_category || 'Outros'))];
-      const imageOf = p => p.image_url || p.menu_image_url || '';
-      app.innerHTML = `<header class="hero rounded-3xl px-5 py-8 sm:px-10 sm:py-10 mb-8"><div class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs font-extrabold tracking-widest uppercase mb-5"><span class="w-2 h-2 rounded-full accent"></span> Cardápio digital</div><h1 class="text-3xl sm:text-5xl font-black tracking-tight">${esc(menu.name||'Cardápio')}</h1><p class="text-zinc-300 mt-3 max-w-2xl leading-relaxed">${esc(menu.description||'Escolha seus favoritos e faça seu pedido!')}</p><div class="mt-5 flex flex-wrap gap-2 text-xs text-zinc-200">${menu.allow_delivery?'<span class="pill px-3 py-2 rounded-full">🛵 Entrega</span>':''}${menu.allow_pickup?'<span class="pill px-3 py-2 rounded-full">🥡 Retirada</span>':''}<span class="pill px-3 py-2 rounded-full">🍽️ Feito para você</span></div></header>
-      <div class="flex flex-col lg:flex-row items-start gap-8"><div class="min-w-0 flex-1 w-full"><div class="mb-6"><h2 class="text-2xl font-black">Escolha seu favorito <span class="text-zinc-500 text-base font-medium">(${visibleProducts.length} opções)</span></h2><p class="text-zinc-400 text-sm mt-1">Fotos, detalhes e sabores para você escolher.</p></div>
-      ${categories.map(category=>`<section class="mb-9"><h3 class="text-lg font-extrabold mb-4 flex items-center gap-2"><span class="inline-block w-1 h-6 rounded accent"></span>${esc(category)}</h3><div class="grid sm:grid-cols-2 gap-4">${visibleProducts.filter(p=>(p.category||p.menu_category||'Outros')===category).map(p=>`<article class="food-card rounded-2xl overflow-hidden flex flex-col">${imageOf(p)?`<img src="${esc(imageOf(p))}" alt="${esc(p.name||p.nome)}" class="food-image" loading="lazy" onerror="this.onerror=null;this.style.display='none';this.nextElementSibling?.classList.remove('hidden')"><div class="hidden bg-zinc-800 h-32 items-center justify-center text-zinc-500 text-sm p-4">Imagem indisponível</div>`:`<div class="bg-zinc-800/60 h-28 flex items-center justify-center text-zinc-500 text-sm">🍽️ Foto em breve</div>`}<div class="p-4 flex flex-col flex-1"><h4 class="text-lg font-extrabold">${esc(p.name||p.nome)}</h4>${(p.description||p.menu_description)?`<p class="text-sm text-zinc-300 mt-2 leading-relaxed">${esc(p.description||p.menu_description)}</p>`:''}${(p.ingredients||p.menu_ingredients)?`<p class="text-xs text-zinc-500 mt-2">Ingredientes: ${esc(p.ingredients||p.menu_ingredients)}</p>`:''}<div class="mt-auto pt-5 flex items-center justify-between gap-2 flex-wrap"><span class="price text-xl font-black">${money(p.price??p.preco_venda)}</span><div class="flex items-center gap-2"><button type="button" aria-label="Remover ${esc(p.name||p.nome)}" data-dec="${esc(p.id)}" class="qty-btn border line bg-zinc-900">−</button><span class="min-w-5 text-center font-bold" aria-live="polite">${Number(cart[p.id]||0)}</span><button type="button" aria-label="Adicionar ${esc(p.name||p.nome)}" data-inc="${esc(p.id)}" class="qty-btn accent">+</button></div></div></div></article>`).join('')}</div></section>`).join('')}
-      ${visibleProducts.length?'':'<p class="text-zinc-400">Ainda não há produtos disponíveis.</p>'}</div>
-      <aside class="order-box rounded-2xl p-5 w-full lg:w-[340px] lg:sticky lg:top-5"><h2 class="text-xl font-black">🛒 Seu pedido</h2><p class="text-zinc-400 text-sm mt-1 mb-4">${count?`${count} ${count===1?'item selecionado':'itens selecionados'}`:'Escolha um produto para começar.'}</p>${selected.length?`<div class="space-y-3 border-t line pt-4 mb-4">${selected.map(p=>`<div class="flex justify-between gap-2 text-sm"><span>${Number(cart[p.id])}× ${esc(p.name||p.nome)}</span><strong class="shrink-0">${money(Number(cart[p.id])*Number(p.price??p.preco_venda??0))}</strong></div>`).join('')}</div>`:''}<div class="flex justify-between text-lg font-black border-t line pt-4 mb-5"><span>Total</span><span class="price">${money(total)}</span></div>
-      <form id="orderForm" class="space-y-3"><h3 class="font-bold">Finalizar pedido</h3><input name="customer_name" required maxlength="120" placeholder="Seu nome" autocomplete="name" class="w-full bg-[#242427] border line rounded-xl p-3 text-base"><input name="customer_phone" required maxlength="40" placeholder="Telefone / WhatsApp" autocomplete="tel" class="w-full bg-[#242427] border line rounded-xl p-3 text-base"><select name="order_type" id="orderType" class="w-full bg-[#242427] border line rounded-xl p-3 text-base">${menu.allow_delivery?'<option value="delivery">🛵 Entrega</option>':''}${menu.allow_pickup?'<option value="pickup">🥡 Retirada no local</option>':''}</select><input name="delivery_address" id="address" maxlength="400" placeholder="Endereço para entrega" autocomplete="street-address" class="w-full bg-[#242427] border line rounded-xl p-3 text-base"><select name="payment_method" class="w-full bg-[#242427] border line rounded-xl p-3 text-base">${(menu.payment_methods||['Pix','Dinheiro','Cartão']).map(x=>`<option>${esc(x)}</option>`).join('')}</select><textarea name="notes" maxlength="500" rows="2" placeholder="Observações (opcional)" class="w-full bg-[#242427] border line rounded-xl p-3 text-base"></textarea><button class="accent w-full rounded-xl p-4 font-extrabold disabled:opacity-50" type="submit" ${count?'':'disabled'}>Enviar pedido · ${money(total)}</button><p id="feedback" role="status" class="text-sm text-zinc-400"></p></form></aside></div>`;
-      // Preserve form fields while customers add or remove products.
-      const fields = app.querySelector('#orderForm');
-      if(window.savedOrderFields && fields){for(const [key,value] of Object.entries(window.savedOrderFields)){const input=fields.elements.namedItem(key);if(input)input.value=value;}}
-      function rememberFields(){const f=app.querySelector('#orderForm');window.savedOrderFields={};if(f){for(const [k,v] of new FormData(f).entries())window.savedOrderFields[k]=v;}}
-      app.querySelectorAll('[data-inc]').forEach(b=>b.onclick=()=>{rememberFields();const id=b.dataset.inc;cart[id]=Math.min(99,Number(cart[id]||0)+1);render();});
-      app.querySelectorAll('[data-dec]').forEach(b=>b.onclick=()=>{rememberFields();const id=b.dataset.dec;cart[id]=Math.max(0,Number(cart[id]||0)-1);render();});
-      const type=app.querySelector('#orderType'),address=app.querySelector('#address');
-      const toggle=()=>{if(!type||!address)return;address.style.display=type.value==='delivery'?'block':'none';address.required=type.value==='delivery';};if(type)type.onchange=toggle;toggle();
-      app.querySelector('#orderForm').onsubmit=async e=>{e.preventDefault();const feedback=app.querySelector('#feedback');const form=new FormData(e.currentTarget);const items=visibleProducts.filter(p=>Number(cart[p.id]||0)>0).map(p=>({product_id:p.id,quantity:Number(cart[p.id])}));if(!items.length){feedback.textContent='Adicione pelo menos um item.';return;}const btn=e.currentTarget.querySelector('button[type=submit]');btn.disabled=true;btn.textContent='Enviando...';try{const result=await callRpc('foodstrick_create_order',{p_slug:slug,p_customer_name:form.get('customer_name'),p_customer_phone:form.get('customer_phone'),p_order_type:form.get('order_type'),p_delivery_address:form.get('delivery_address'),p_payment_method:form.get('payment_method'),p_notes:form.get('notes'),p_items:items});window.savedOrderFields=null;app.innerHTML=`<div class="min-h-[70vh] flex flex-col items-center justify-center text-center"><div class="accent rounded-full w-16 h-16 flex items-center justify-center text-3xl mb-5">✓</div><h1 class="text-2xl font-black">Pedido enviado!</h1><p class="text-zinc-400 mt-2">Número do pedido: <strong class="text-white">${esc(result.order_id)}</strong></p><p class="mt-3">Total: <strong>${money(result.total)}</strong></p><p class="text-sm text-zinc-500 mt-5">O estabelecimento precisa confirmar seu pedido.</p><button id="newOrder" class="accent rounded-xl px-6 py-3 mt-6 font-bold">Fazer outro pedido</button></div>`;app.querySelector('#newOrder').onclick=()=>{cart={};render();};}catch(err){feedback.textContent=err.message||'Não foi possível enviar o pedido.';btn.disabled=false;btn.textContent='Tentar novamente';}};
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const LOGIN_BG_IMAGE = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=1920&auto=format&fit=crop";
+
+    // ==========================================
+    // COMPONENTE: LIVE CURSOR (SUPORTE AO VIVO)
+    // ==========================================
+    function LiveCursor({ companyId, currentUsername, currentUserRole, targetUsername, isActive, supabaseClient }) {
+      const [remoteCursor, setRemoteCursor] = useState(null);
+      const [isRemoteOnline, setIsRemoteOnline] = useState(false);
+      const [clickRipples, setClickRipples] = useState([]);
+      const lastEmitRef = useRef(0);
+      const lastScrollEmitRef = useRef(0);
+      const timeoutRef = useRef(null);
+      const isReceivingScrollRef = useRef(false);
+
+      useEffect(() => {
+        if (!isActive || !companyId || !targetUsername || !supabaseClient) {
+          setRemoteCursor(null);
+          return;
+        }
+
+        const channel = supabaseClient.channel(`cursor-${companyId}-${targetUsername}`, {
+          config: { broadcast: { self: false } }
+        });
+
+        channel
+          .on('broadcast', { event: 'cursor-pos' }, ({ payload }) => {
+            if (payload && payload.sender !== currentUsername) {
+              setRemoteCursor({ xRatio: payload.xRatio, yRatio: payload.yRatio, sender: payload.sender, role: payload.role });
+              setIsRemoteOnline(true);
+              if (timeoutRef.current) clearTimeout(timeoutRef.current);
+              timeoutRef.current = setTimeout(() => setIsRemoteOnline(false), 4000);
+            }
+          })
+          .on('broadcast', { event: 'cursor-click' }, ({ payload }) => {
+            if (payload && payload.sender !== currentUsername) {
+              const posX = payload.xRatio * window.innerWidth;
+              const posY = payload.yRatio * window.innerHeight;
+              const rippleId = Date.now();
+              setClickRipples(prev => [...prev, { id: rippleId, x: posX, y: posY }]);
+              setTimeout(() => setClickRipples(prev => prev.filter(r => r.id !== rippleId)), 800);
+
+              const el = document.elementFromPoint(posX, posY);
+              if (el) {
+                el.click();
+                if (['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName)) el.focus();
+              }
+            }
+          })
+          .on('broadcast', { event: 'page-scroll' }, ({ payload }) => {
+            if (payload && payload.sender !== currentUsername) {
+              isReceivingScrollRef.current = true;
+              const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+              window.scrollTo({ top: payload.scrollRatio * (maxScroll > 0 ? maxScroll : 1), behavior: 'smooth' });
+              setTimeout(() => { isReceivingScrollRef.current = false; }, 150);
+            }
+          })
+          .subscribe();
+
+        const handleMouseMove = (e) => {
+          const now = Date.now();
+          if (now - lastEmitRef.current > 25) {
+            lastEmitRef.current = now;
+            channel.send({
+              type: 'broadcast',
+              event: 'cursor-pos',
+              payload: { xRatio: e.clientX / window.innerWidth, yRatio: e.clientY / window.innerHeight, sender: currentUsername, role: currentUserRole || 'operador' }
+            });
+          }
+        };
+
+        const handleClick = (e) => {
+          channel.send({
+            type: 'broadcast',
+            event: 'cursor-click',
+            payload: { xRatio: e.clientX / window.innerWidth, yRatio: e.clientY / window.innerHeight, sender: currentUsername }
+          });
+        };
+
+        const handleScroll = () => {
+          if (isReceivingScrollRef.current) return;
+          const now = Date.now();
+          if (now - lastScrollEmitRef.current > 40) {
+            lastScrollEmitRef.current = now;
+            const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+            channel.send({
+              type: 'broadcast',
+              event: 'page-scroll',
+              payload: { scrollRatio: maxScroll > 0 ? window.scrollY / maxScroll : 0, sender: currentUsername }
+            });
+          }
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('click', handleClick);
+        window.addEventListener('scroll', handleScroll, { passive: true });
+
+        return () => {
+          window.removeEventListener('mousemove', handleMouseMove);
+          window.removeEventListener('click', handleClick);
+          window.removeEventListener('scroll', handleScroll);
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          supabaseClient.removeChannel(channel);
+        };
+      }, [isActive, companyId, targetUsername, currentUsername, currentUserRole, supabaseClient]);
+
+      if (!isActive || !remoteCursor || !isRemoteOnline) return null;
+
+      const posX = remoteCursor.xRatio * (typeof window !== 'undefined' ? window.innerWidth : 1000);
+      const posY = remoteCursor.yRatio * (typeof window !== 'undefined' ? window.innerHeight : 800);
+      const isSuper = remoteCursor.role === 'superadmin' || remoteCursor.sender === 'admin';
+
+      return (
+        <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
+          {clickRipples.map(ripple => (
+            <span key={ripple.id} style={{ left: ripple.x - 18, top: ripple.y - 18 }} className="absolute w-9 h-9 rounded-full border-2 border-[#D95B1E] animate-ping opacity-90 pointer-events-none" />
+          ))}
+          <div style={{ transform: `translate3d(${posX}px, ${posY}px, 0)`, transition: 'transform 0.04s linear' }} className="absolute top-0 left-0 flex flex-col items-start select-none">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className="drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] -translate-x-1 -translate-y-1">
+              <path d="M5.65 2.15C5.1 1.6 4.25 2.05 4.3 2.85L5.75 19.35C5.8 20.05 6.7 20.35 7.2 19.85L11.5 15.5L16.2 21.8C16.5 22.2 17.1 22.3 17.5 22L20.2 20C20.6 19.7 20.7 19.1 20.4 18.7L15.7 12.4L21.4 11.2C22.1 11.05 22.3 10.15 21.75 9.75L5.65 2.15Z" fill={isSuper ? '#D95B1E' : '#10B981'} stroke="#000000" strokeWidth="1.5" />
+            </svg>
+            <div className={`ml-3 -mt-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white shadow-xl flex items-center gap-1.5 border border-black/30 ${isSuper ? 'bg-[#D95B1E]' : 'bg-emerald-600'}`}>
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+              <span>{isSuper ? `Suporte (${remoteCursor.sender})` : remoteCursor.sender}</span>
+            </div>
+          </div>
+        </div>
+      );
     }
-    (async()=>{try{if(!slug)throw new Error('Link de cardápio inválido.');const result=await callRpc('foodstrick_public_menu',{p_slug:slug});menu=result.menu;products=result.products||[];if(!products.length){products=[];}render();}catch(e){app.innerHTML=`<div class="py-20 text-center"><h1 class="text-2xl font-bold">Cardápio indisponível</h1><p class="text-zinc-400 mt-2">${esc(e.message||'Tente novamente mais tarde.')}</p></div>`;}})();
+
+    // ==========================================
+    // COMPONENTE: SUPPORT CHAT (CHAT EM TEMPO REAL)
+    // ==========================================
+    function SupportChat({ companyId, currentUsername, currentUserRole, operatorUsername, isVisible, supabaseClient }) {
+      const [isOpen, setIsOpen] = useState(false);
+      const [messages, setMessages] = useState([]);
+      const [newMessage, setNewMessage] = useState('');
+      const [unreadCount, setUnreadCount] = useState(0);
+      const messagesEndRef = useRef(null);
+
+      const fetchMessages = async () => {
+        if (!companyId || !operatorUsername || !supabaseClient) return;
+        try {
+          const { data } = await supabaseClient
+            .from('support_messages')
+            .select('*')
+            .eq('company_id', companyId)
+            .eq('operator_username', operatorUsername)
+            .order('created_at', { ascending: true });
+          if (data) setMessages(data);
+        } catch (err) {}
+      };
+
+      useEffect(() => {
+        if (!isVisible || !companyId || !operatorUsername || !supabaseClient) return;
+        fetchMessages();
+
+        const channel = supabaseClient.channel(`chat-${companyId}-${operatorUsername}`)
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `operator_username=eq.${operatorUsername}` }, (payload) => {
+            if (payload.new && payload.new.company_id === companyId) {
+              setMessages(prev => [...prev, payload.new]);
+              if (!isOpen && payload.new.sender_username !== currentUsername) setUnreadCount(c => c + 1);
+            }
+          }).subscribe();
+
+        return () => { supabaseClient.removeChannel(channel); };
+      }, [companyId, operatorUsername, isOpen, currentUsername, isVisible, supabaseClient]);
+
+      useEffect(() => {
+        if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, [messages, isOpen]);
+
+      if (!isVisible || !companyId || !operatorUsername) return null;
+
+      const handleSendMessage = async (e) => {
+        e.preventDefault();
+        const text = newMessage.trim();
+        if (!text) return;
+        setNewMessage('');
+        try {
+          await supabaseClient.from('support_messages').insert([{
+            company_id: companyId,
+            operator_username: operatorUsername,
+            sender_username: currentUsername,
+            sender_role: currentUserRole || 'operador',
+            message: text
+          }]);
+        } catch (err) {}
+      };
+
+      return (
+        <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end">
+          {isOpen && (
+            <div className="w-80 sm:w-96 h-[480px] bg-[#161616] border border-[#2d2d2d] rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-3">
+              <div className="p-4 bg-[#111111] border-b border-[#262626] flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-[#D95B1E]/10 border border-[#D95B1E]/30 flex items-center justify-center text-[#D95B1E]">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                      Canal Direto de Suporte
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    </h4>
+                    <p className="text-[10px] text-zinc-400">Atendimento: <strong className="text-[#D95B1E]">{operatorUsername}</strong></p>
+                  </div>
+                </div>
+                <button onClick={() => setIsOpen(false)} className="text-zinc-400 hover:text-white p-1 rounded-lg">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+              </div>
+
+              <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs">
+                {messages.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center text-zinc-500 space-y-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-700"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <p className="text-[11px]">Nenhuma mensagem ainda.<br />Inicie a conversa pelo suporte.</p>
+                  </div>
+                ) : (
+                  messages.map(m => {
+                    const isMe = m.sender_username?.toLowerCase() === currentUsername?.toLowerCase();
+                    return (
+                      <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                        <span className="text-[10px] text-zinc-500 mb-0.5 px-1">{isMe ? 'Você' : m.sender_username} ({m.sender_role})</span>
+                        <div className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${isMe ? 'bg-[#D95B1E] text-white font-medium rounded-tr-none' : 'bg-[#222222] text-white rounded-tl-none border border-[#333]'}`}>
+                          {m.message}
+                        </div>
+                        <span className="text-[9px] text-zinc-600 mt-0.5 px-1 font-mono">{new Date(m.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              <form onSubmit={handleSendMessage} className="p-3 bg-[#111111] border-t border-[#262626] flex items-center gap-2">
+                <input type="text" placeholder="Digite sua mensagem..." value={newMessage} onChange={e => setNewMessage(e.target.value)} className="flex-1 bg-[#1c1c1c] border border-[#333] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-[#D95B1E] transition-colors placeholder:text-zinc-500" />
+                <button type="submit" className="bg-[#D95B1E] hover:bg-[#c34e17] text-white p-2 rounded-xl transition-all shadow-md disabled:opacity-40" disabled={!newMessage.trim()}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                </button>
+              </form>
+            </div>
+          )}
+
+          <button onClick={() => { if (!isOpen) setUnreadCount(0); setIsOpen(!isOpen); }} className="w-14 h-14 rounded-full bg-[#D95B1E] hover:bg-[#c34e17] text-white shadow-2xl flex items-center justify-center transition-transform hover:scale-105 active:scale-95 relative border-2 border-orange-400/30 cursor-pointer" title="Abrir Chat de Suporte">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            {unreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-black">{unreadCount}</span>}
+          </button>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // APLICAÇÃO PRINCIPAL (APP)
+    // ==========================================
+    function App() {
+      const [currentUser, setCurrentUser] = useState(() => {
+        try {
+          const s = localStorage.getItem('foodstrick_master_session');
+          return s ? JSON.parse(s) : null;
+        } catch(e) { return null; }
+      });
+
+      const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(currentUser));
+
+      const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+      const [impersonatedCompany, setImpersonatedCompany] = useState(null);
+      const [adminInsideNotification, setAdminInsideNotification] = useState(null);
+
+      const [username, setUsername] = useState('');
+      const [password, setPassword] = useState('');
+      const [showPassword, setShowPassword] = useState(false);
+      const [authError, setAuthError] = useState('');
+
+      const [abaAtiva, setAbaAtiva] = useState('painel'); 
+      const [subAbaConfig, setSubAbaConfig] = useState('conta'); 
+
+      // Cache isolado especificamente pela empresa conectada
+      const activeCompId = impersonatedCompany ? impersonatedCompany.company_id : currentUser?.company_id;
+
+      const [produtos, setProdutos] = useState(() => {
+        try {
+          if (!activeCompId) return [];
+          const c = localStorage.getItem(`cache_prods_${activeCompId}`);
+          return c ? JSON.parse(c) : [];
+        } catch(e) { return []; }
+      });
+
+      const [lancamentos, setLancamentos] = useState(() => {
+        try {
+          if (!activeCompId) return [];
+          const c = localStorage.getItem(`cache_lancs_${activeCompId}`);
+          return c ? JSON.parse(c) : [];
+        } catch(e) { return []; }
+      });
+
+      const [historicoFechamentos, setHistoricoFechamentos] = useState([]);
+      const [processandoFechamento, setProcessandoFechamento] = useState(false);
+
+      const [modalExclusao, setModalExclusao] = useState({ aberto: false, idLancamento: null });
+      const [motivoExclusao, setMotivoExclusao] = useState('Pedido cancelado');
+      const [modalExcluirProduto, setModalExcluirProduto] = useState({ aberto: false, idProduto: null, nome: '' });
+      
+      const [modalEditarProduto, setModalEditarProduto] = useState({ aberto: false, id: null, nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
+      const [modalFichaTecnica, setModalFichaTecnica] = useState({ aberto: false, produto: null });
+      const [novoInsumo, setNovoInsumo] = useState({ nome: '', quantidade: '', custo: '' });
+
+      const [novoLancamento, setNovoLancamento] = useState({
+        data: new Date().toISOString().split('T')[0],
+        tipo: 'Venda', produto_id: '', descricao: '', quantidade: 1, 
+        pagamento: 'Pix', canal_categoria: 'Delivery', valor_despesa: '', fornecedor: ''
+      });
+
+      const [novoProduto, setNovoProduto] = useState({ nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
+
+      // Cardápio Online: dados separados por estabelecimento
+      const [menuSettings, setMenuSettings] = useState({ menu_enabled: true, menu_slug: '', menu_description: '', menu_accent_color: '#D95B1E', menu_cover_image: '', menu_allow_delivery: true, menu_allow_pickup: true, menu_payment_methods: ['Pix', 'Dinheiro', 'Cartão'] });
+      const [menuProductForm, setMenuProductForm] = useState({ id: null, nome: '', preco_venda: '', custo_unitario: '0', menu_description: '', menu_ingredients: '', menu_category: 'Pratos', menu_image_url: '', menu_available: true });
+      const [menuSaving, setMenuSaving] = useState(false);
+      const [menuLoaded, setMenuLoaded] = useState(false);
+      const [menuSettingsError, setMenuSettingsError] = useState('');
+
+      // Pedidos recebidos pelo cardápio público
+      const [pedidosOnline, setPedidosOnline] = useState([]);
+      const [pedidosLoading, setPedidosLoading] = useState(false);
+      const [pedidosError, setPedidosError] = useState('');
+      const [pedidoAtualizando, setPedidoAtualizando] = useState(null);
+      const [pedidoExpandido, setPedidoExpandido] = useState(null);
+      const [filtroPedidos, setFiltroPedidos] = useState('todos');
+
+      const [companiesList, setCompaniesList] = useState([]);
+      const [newCompanyName, setNewCompanyName] = useState('');
+      const [newCompanySlug, setNewCompanySlug] = useState('');
+      const [newCompanyPhone, setNewCompanyPhone] = useState('');
+      const [newCompanyAdminUser, setNewCompanyAdminUser] = useState('');
+      const [newCompanyAdminPass, setNewCompanyAdminPass] = useState('');
+
+      const avatarInputRef = useRef(null);
+
+      const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.username === 'admin';
+      const effectiveCompanyId = impersonatedCompany ? impersonatedCompany.company_id : currentUser?.company_id;
+      const effectiveCompanyName = impersonatedCompany ? impersonatedCompany.company_name : (currentUser?.unidade || 'FoodStrick');
+
+      // Verificação em segundo plano da presença de suporte
+      useEffect(() => {
+        if (!isAuthenticated || !currentUser || isSuperAdmin) return;
+        const checkSupport = async () => {
+          try {
+            const { data } = await supabaseClient.from('app_users').select('active_support_by').eq('company_id', currentUser.company_id).maybeSingle();
+            if (data && data.active_support_by) setAdminInsideNotification(data.active_support_by);
+            else setAdminInsideNotification(null);
+          } catch (err) {}
+        };
+        checkSupport();
+        const interval = setInterval(checkSupport, 12000);
+        return () => clearInterval(interval);
+      }, [isAuthenticated, currentUser, isSuperAdmin]);
+
+      // CARREGAMENTO RIGOROSO: Cada empresa acede unicamente aos seus dados
+      useEffect(() => {
+        if (isAuthenticated && effectiveCompanyId && effectiveCompanyId !== 'foodstrick-master') {
+          carregarTudoEmParalelo(effectiveCompanyId);
+        }
+      }, [isAuthenticated, effectiveCompanyId]);
+
+      async function carregarTudoEmParalelo(compId) {
+        try {
+          let queryProd = supabaseClient.from('produtos').select('*');
+          let queryLanc = supabaseClient.from('lancamentos').select('*');
+
+          if (compId === 'cozinha-brasileira') {
+            queryProd = queryProd.or('company_id.eq.cozinha-brasileira,company_id.is.null');
+            queryLanc = queryLanc.or('company_id.eq.cozinha-brasileira,company_id.is.null');
+          } else {
+            queryProd = queryProd.eq('company_id', compId);
+            queryLanc = queryLanc.eq('company_id', compId);
+          }
+
+          const [resProd, resLanc, resFech] = await Promise.all([
+            queryProd.order('nome'),
+            queryLanc.order('data', { ascending: false }),
+            supabaseClient.from('fechamentos').select('*').eq('company_id', compId).order('data_fechamento', { ascending: false })
+          ]);
+
+          if (resProd.data) {
+            setProdutos(resProd.data);
+            localStorage.setItem(`cache_prods_${compId}`, JSON.stringify(resProd.data));
+          }
+          if (resLanc.data) {
+            setLancamentos(resLanc.data);
+            localStorage.setItem(`cache_lancs_${compId}`, JSON.stringify(resLanc.data));
+          }
+          if (resFech.data) setHistoricoFechamentos(resFech.data);
+        } catch (err) {
+          console.error("Erro na sincronização:", err);
+        }
+      }
+
+      const handleLogin = async (e) => {
+        e.preventDefault();
+        setAuthError('');
+        const cleanUser = username.trim().toLowerCase();
+
+        if (cleanUser === 'admin' && (password === 'admin123' || password === '123')) {
+          const superAdminObj = { username: 'admin', role: 'superadmin', company_id: 'foodstrick-master', unidade: 'FoodStrick Master' };
+          localStorage.setItem('foodstrick_master_session', JSON.stringify(superAdminObj));
+          setCurrentUser(superAdminObj);
+          setIsAuthenticated(true);
+          setAbaAtiva('configuracoes');
+          setSubAbaConfig('empresas');
+          fetchCompanies();
+          return;
+        }
+
+        if (cleanUser === 'cozinha' && password === '123') {
+          let avatar = null;
+          try {
+            const { data } = await supabaseClient.from('app_users').select('avatar_url').eq('username', 'cozinha').maybeSingle();
+            if (data) avatar = data.avatar_url;
+          } catch(e){}
+
+          const legacyObj = { username: 'cozinha', role: 'operador', company_id: 'cozinha-brasileira', unidade: 'Cozinha Brasileira', avatar_url: avatar };
+          localStorage.setItem('foodstrick_master_session', JSON.stringify(legacyObj));
+          setCurrentUser(legacyObj);
+          setIsAuthenticated(true);
+          setAbaAtiva('painel');
+          return;
+        }
+
+        try {
+          const { data: userData } = await supabaseClient.from('app_users').select('*').ilike('username', cleanUser).eq('password', password).maybeSingle();
+          if (userData) {
+            const { data: comp } = await supabaseClient.from('companies').select('*').eq('company_id', userData.company_id).maybeSingle();
+            if (comp && comp.status === 'bloqueado') {
+              setAuthError('Acesso bloqueado: este estabelecimento está suspenso.');
+              return;
+            }
+
+            const userObj = { 
+              username: userData.username, 
+              role: userData.role || 'operador', 
+              company_id: userData.company_id, 
+              unidade: comp ? comp.company_name : 'Minha Cozinha', 
+              avatar_url: userData.avatar_url 
+            };
+            localStorage.setItem('foodstrick_master_session', JSON.stringify(userObj));
+            setCurrentUser(userObj);
+            setIsAuthenticated(true);
+            setAbaAtiva('painel');
+            return;
+          }
+        } catch (err) {}
+
+        setAuthError('Utilizador ou palavra-passe incorretos.');
+      };
+
+      const handleLogout = async () => {
+        if (impersonatedCompany) await handleStopImpersonation();
+        localStorage.removeItem('foodstrick_master_session');
+        localStorage.removeItem('cache_prods');
+        localStorage.removeItem('cache_lancs');
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+        setImpersonatedCompany(null);
+        setAdminInsideNotification(null);
+        setUsername(''); setPassword('');
+        setProdutos([]); setLancamentos([]);
+        setMobileMenuOpen(false);
+      };
+
+      const handleStartImpersonation = async (comp) => {
+        try {
+          await supabaseClient.from('app_users').update({ active_support_by: currentUser.username }).eq('company_id', comp.company_id);
+          setImpersonatedCompany(comp);
+          setAbaAtiva('painel');
+          setMobileMenuOpen(false);
+        } catch (err) {}
+      };
+
+      const handleStopImpersonation = async () => {
+        if (impersonatedCompany) {
+          try {
+            await supabaseClient.from('app_users').update({ active_support_by: null }).eq('company_id', impersonatedCompany.company_id);
+          } catch (err) {}
+        }
+        setImpersonatedCompany(null);
+        setAbaAtiva('configuracoes');
+        setSubAbaConfig('empresas');
+      };
+
+      // Cálculos Financeiros
+      const lancamentosAtivos = useMemo(() => lancamentos.filter(l => l.status === 'ativo' || l.status === null), [lancamentos]);
+      const lancamentosExcluidos = useMemo(() => lancamentos.filter(l => l.status === 'excluido'), [lancamentos]);
+
+      const { faturamento, lucroProdutos, totalDespesas, resultadoMes, totalBebidas, totalPratos } = useMemo(() => {
+        let fat = 0, lucroP = 0, desp = 0, beb = 0, pratos = 0;
+        for (let i = 0; i < lancamentosAtivos.length; i++) {
+          const l = lancamentosAtivos[i];
+          const val = Number(l.valor_total) || 0;
+          if (l.tipo === 'Venda') {
+            fat += val;
+            lucroP += (val - (Number(l.custo_total) || 0));
+            if (l.canal_categoria === 'Bebidas') beb += Number(l.quantidade || 0);
+            else pratos += Number(l.quantidade || 0);
+          } else if (l.tipo === 'Despesa') {
+            desp += val;
+          }
+        }
+        return { faturamento: fat, lucroProdutos: lucroP, totalDespesas: desp, resultadoMes: lucroP - desp, totalBebidas: beb, totalPratos: pratos };
+      }, [lancamentosAtivos]);
+
+      const arrayIngredientes = useMemo(() => {
+        const mapa = {};
+        const prodsMap = new Map(produtos.map(p => [p.id, p]));
+        lancamentosAtivos.forEach(venda => {
+          if (venda.tipo !== 'Venda') return;
+          const prod = prodsMap.get(venda.produto_id);
+          if (prod && Array.isArray(prod.ingredientes)) {
+            prod.ingredientes.forEach(ing => {
+              const num = parseFloat(ing.quantidade) || 1;
+              const totalQtd = num * Number(venda.quantidade || 1);
+              const unidade = String(ing.quantidade).replace(/[0-9.,]/g, '').trim() || 'un';
+              if (!mapa[ing.nome]) mapa[ing.nome] = { qtd: 0, unidade: unidade, custoTotal: 0 };
+              mapa[ing.nome].qtd += totalQtd;
+              mapa[ing.nome].custoTotal += (Number(ing.custo || 0) * Number(venda.quantidade || 1));
+            });
+          }
+        });
+        return Object.entries(mapa).sort((a, b) => b[1].qtd - a[1].qtd);
+      }, [lancamentosAtivos, produtos]);
+
+      async function carregarConfiguracaoCardapio(compId) {
+        if (!compId) return;
+        setMenuSettingsError('');
+        try {
+          const { data, error } = await supabaseClient.from('companies').select('*').eq('company_id', compId).maybeSingle();
+          if (error) throw error;
+          const slugDefault = compId === 'cozinha-brasileira' ? 'foodstrick' : String(compId).toLowerCase().replace(/[^a-z0-9-]/g, '-');
+          setMenuSettings({
+            menu_enabled: data?.menu_enabled ?? (compId === 'cozinha-brasileira'),
+            menu_slug: data?.menu_slug || slugDefault,
+            menu_description: data?.menu_description || '',
+            menu_accent_color: data?.menu_accent_color || '#D95B1E',
+            menu_cover_image: data?.menu_cover_image || '',
+            menu_allow_delivery: data?.menu_allow_delivery ?? true,
+            menu_allow_pickup: data?.menu_allow_pickup ?? true,
+            menu_payment_methods: Array.isArray(data?.menu_payment_methods) ? data.menu_payment_methods : ['Pix', 'Dinheiro', 'Cartão']
+          });
+          setMenuLoaded(true);
+        } catch (err) {
+          setMenuSettingsError('Não foi possível carregar as configurações. Confira as permissões da tabela companies: ' + (err.message || 'erro desconhecido'));
+        }
+      }
+
+      async function salvarConfiguracaoCardapio(e) {
+        e.preventDefault();
+        if (!effectiveCompanyId || effectiveCompanyId === 'foodstrick-master') return alert('Entre em uma empresa para configurar o cardápio.');
+        const slug = String(menuSettings.menu_slug || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+        if (!slug) return alert('Informe um endereço público válido.');
+        if (!menuSettings.menu_allow_delivery && !menuSettings.menu_allow_pickup) return alert('Ative entrega, retirada ou ambas.');
+        setMenuSaving(true);
+        const payload = {
+          menu_enabled: Boolean(menuSettings.menu_enabled), menu_slug: slug,
+          menu_description: String(menuSettings.menu_description || '').trim(),
+          menu_accent_color: /^#[0-9a-fA-F]{6}$/.test(menuSettings.menu_accent_color) ? menuSettings.menu_accent_color : '#D95B1E',
+          menu_cover_image: String(menuSettings.menu_cover_image || ''),
+          menu_allow_delivery: Boolean(menuSettings.menu_allow_delivery), menu_allow_pickup: Boolean(menuSettings.menu_allow_pickup),
+          menu_payment_methods: (menuSettings.menu_payment_methods || []).filter(Boolean),
+          updated_at: new Date().toISOString()
+        };
+        const { error } = await supabaseClient.from('companies').update(payload).eq('company_id', effectiveCompanyId);
+        if (error) alert('Não foi possível salvar as configurações: ' + error.message);
+        else {
+          setMenuSettings(prev => ({ ...prev, ...payload }));
+          alert('Configurações do cardápio salvas!');
+        }
+        setMenuSaving(false);
+      }
+
+      function editarProdutoCardapio(prod) {
+        setMenuProductForm({
+          id: prod.id, nome: prod.nome || '', preco_venda: String(prod.preco_venda ?? ''), custo_unitario: String(prod.custo_unitario ?? '0'),
+          menu_description: prod.menu_description || prod.observacao || '',
+          menu_ingredients: prod.menu_ingredients || '', menu_category: prod.menu_category || 'Pratos',
+          menu_image_url: prod.menu_image_url || '', menu_available: prod.menu_available !== false
+        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      function handleMenuImageUpload(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) { alert('Selecione um arquivo de imagem.'); e.target.value = ''; return; }
+        if (file.size > 5 * 1024 * 1024) { alert('A imagem deve ter no máximo 5 MB.'); e.target.value = ''; return; }
+        const reader = new FileReader();
+        reader.onload = event => {
+          const img = new Image();
+          img.onload = () => {
+            const maxSize = 900;
+            let width = img.width, height = img.height;
+            if (width > height && width > maxSize) { height = Math.round(height * maxSize / width); width = maxSize; }
+            else if (height > maxSize) { width = Math.round(width * maxSize / height); height = maxSize; }
+            const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
+            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL('image/jpeg', 0.78);
+            setMenuProductForm(v => ({ ...v, menu_image_url: compressed }));
+          };
+          img.onerror = () => alert('Não foi possível ler essa imagem.');
+          img.src = event.target.result;
+        };
+        reader.onerror = () => alert('Falha ao carregar a imagem.');
+        reader.readAsDataURL(file);
+      }
+
+      function handleMenuCoverUpload(e) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) { alert('Escolha uma imagem válida.'); e.target.value = ''; return; }
+        if (file.size > 8 * 1024 * 1024) { alert('A imagem deve ter até 8 MB.'); e.target.value = ''; return; }
+        const reader = new FileReader();
+        reader.onload = event => {
+          const img = new Image();
+          img.onload = () => {
+            const maxWidth = 1400, maxHeight = 700;
+            const scale = Math.min(1, maxWidth / img.width, maxHeight / img.height);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            setMenuSettings(v => ({...v, menu_cover_image: canvas.toDataURL('image/jpeg', 0.7)}));
+          };
+          img.onerror = () => alert('Não foi possível abrir a imagem.');
+          img.src = event.target.result;
+        };
+        reader.onerror = () => alert('Não foi possível carregar o arquivo.');
+        reader.readAsDataURL(file);
+        e.target.value = '';
+      }
+
+      async function salvarProdutoCardapio(e) {
+        e.preventDefault();
+        const compId = effectiveCompanyId;
+        if (!compId || compId === 'foodstrick-master') return alert('Selecione uma empresa antes de editar o cardápio.');
+        const preco = Number(String(menuProductForm.preco_venda).replace(',', '.'));
+        if (!menuProductForm.nome.trim() || !Number.isFinite(preco) || preco < 0) return alert('Informe nome e preço válido.');
+        const payload = {
+          company_id: compId, nome: menuProductForm.nome.trim(), preco_venda: preco, custo_unitario: Math.max(0, Number(String(menuProductForm.custo_unitario || '0').replace(',', '.')) || 0),
+          menu_description: menuProductForm.menu_description.trim(), menu_ingredients: menuProductForm.menu_ingredients.trim(),
+          menu_category: menuProductForm.menu_category.trim() || 'Outros', menu_image_url: menuProductForm.menu_image_url.trim(),
+          menu_available: Boolean(menuProductForm.menu_available)
+        };
+        setMenuSaving(true);
+        let result;
+        if (menuProductForm.id) {
+          const existingMenuProduct = produtos.find(p => p.id === menuProductForm.id);
+          let updateQuery = supabaseClient.from('produtos').update(payload).eq('id', menuProductForm.id);
+          if (existingMenuProduct && existingMenuProduct.company_id === null && compId === 'cozinha-brasileira') updateQuery = updateQuery.is('company_id', null);
+          else updateQuery = updateQuery.eq('company_id', compId);
+          result = await updateQuery.select().maybeSingle();
+        } else {
+          payload.observacao = payload.menu_description; payload.ingredientes = [];
+          result = await supabaseClient.from('produtos').insert([payload]).select().single();
+        }
+        if (result.error) alert('Erro ao salvar produto: ' + result.error.message);
+        else {
+          setMenuProductForm({ id: null, nome: '', preco_venda: '', custo_unitario: '0', menu_description: '', menu_ingredients: '', menu_category: 'Pratos', menu_image_url: '', menu_available: true });
+          await carregarTudoEmParalelo(compId);
+          alert('Produto do cardápio salvo!');
+        }
+        setMenuSaving(false);
+      }
+
+      async function alternarDisponibilidadeCardapio(prod) {
+        const compId = effectiveCompanyId;
+        let updateQuery = supabaseClient.from('produtos').update({ menu_available: prod.menu_available === false, company_id: compId }).eq('id', prod.id);
+        if (prod.company_id === null && compId === 'cozinha-brasileira') updateQuery = updateQuery.is('company_id', null); else updateQuery = updateQuery.eq('company_id', compId);
+        const { error } = await updateQuery;
+        if (error) alert('Erro ao atualizar disponibilidade: ' + error.message);
+        else carregarTudoEmParalelo(compId);
+      }
+
+      async function handleSalvarLancamento(e) {
+        e.preventDefault();
+        const compTarget = effectiveCompanyId || 'cozinha-brasileira';
+        let total = 0, custo = 0, desc = novoLancamento.descricao;
+
+        if (novoLancamento.tipo === 'Venda') {
+          const prod = produtos.find(p => p.id === novoLancamento.produto_id);
+          if (!prod) return alert('Selecione um produto.');
+          desc = prod.nome;
+          total = Number(prod.preco_venda) * Number(novoLancamento.quantidade);
+          custo = Number(prod.custo_unitario) * Number(novoLancamento.quantidade);
+        } else {
+          total = Number(novoLancamento.valor_despesa);
+        }
+
+        const payload = {
+          company_id: compTarget, 
+          data: novoLancamento.data, 
+          tipo: novoLancamento.tipo,
+          descricao: desc, 
+          produto_id: novoLancamento.tipo === 'Venda' ? novoLancamento.produto_id : null,
+          quantidade: novoLancamento.tipo === 'Venda' ? Number(novoLancamento.quantidade) : null,
+          pagamento: novoLancamento.pagamento, 
+          canal_categoria: novoLancamento.canal_categoria,
+          valor_total: total, 
+          custo_total: custo, 
+          resultado: novoLancamento.tipo === 'Venda' ? total - custo : -total,
+          fornecedor: novoLancamento.tipo === 'Despesa' ? novoLancamento.fornecedor : null, 
+          status: 'ativo'
+        };
+
+        const { error } = await supabaseClient.from('lancamentos').insert([payload]);
+        if (error) alert("Erro: " + error.message);
+        else {
+          carregarTudoEmParalelo(compTarget);
+          setNovoLancamento({ ...novoLancamento, descricao: '', valor_despesa: '', quantidade: 1, produto_id: '', fornecedor: '' });
+        }
+      }
+
+      async function confirmarExclusao() {
+        if (!modalExclusao.idLancamento) return;
+        const compTarget = effectiveCompanyId || 'cozinha-brasileira';
+        const { error } = await supabaseClient.from('lancamentos').update({ status: 'excluido', motivo_exclusao: motivoExclusao }).eq('id', modalExclusao.idLancamento);
+        if (error) alert("Erro: " + error.message);
+        else { carregarTudoEmParalelo(compTarget); setModalExclusao({ aberto: false, idLancamento: null }); }
+      }
+
+      async function handleSalvarProduto(e) {
+        e.preventDefault();
+        const compTarget = effectiveCompanyId || 'cozinha-brasileira';
+        const rawPreco = String(novoProduto.preco_venda).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+        const rawCusto = String(novoProduto.custo_unitario).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+        
+        const payload = { 
+          company_id: compTarget, 
+          nome: novoProduto.nome.trim(), 
+          preco_venda: parseFloat(rawPreco) || 0, 
+          custo_unitario: parseFloat(rawCusto) || 0, 
+          observacao: novoProduto.observacao ? novoProduto.observacao.trim() : '', 
+          ingredientes: [] 
+        };
+
+        const { error } = await supabaseClient.from('produtos').insert([payload]);
+        if (error) alert("Erro ao criar produto: " + error.message);
+        else { 
+          carregarTudoEmParalelo(compTarget); 
+          setNovoProduto({ nome: '', preco_venda: '', custo_unitario: '', observacao: '' }); 
+        }
+      }
+
+      // 1. EDIÇÃO DE PRODUTO (CORRIGIDA)
+      async function handleAtualizarProduto(e) {
+        e.preventDefault();
+        const compTarget = effectiveCompanyId || 'cozinha-brasileira';
+        const rawPreco = String(modalEditarProduto.preco_venda).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+        const rawCusto = String(modalEditarProduto.custo_unitario).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+
+        const payload = {
+          nome: modalEditarProduto.nome.trim(),
+          preco_venda: parseFloat(rawPreco) || 0,
+          custo_unitario: parseFloat(rawCusto) || 0,
+          observacao: modalEditarProduto.observacao ? modalEditarProduto.observacao.trim() : ''
+        };
+
+        const { error } = await supabaseClient.from('produtos').update(payload).eq('id', modalEditarProduto.id);
+        if (error) {
+          alert("Erro ao atualizar produto: " + error.message);
+        } else {
+          setProdutos(prev => prev.map(p => p.id === modalEditarProduto.id ? { ...p, ...payload } : p));
+          setModalEditarProduto({ aberto: false, id: null, nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
+          carregarTudoEmParalelo(compTarget);
+        }
+      }
+
+      // 2. ELIMINAÇÃO DE PRODUTO (CORRIGIDA)
+      async function deletarProduto(id) {
+        const compTarget = effectiveCompanyId || 'cozinha-brasileira';
+        const { error } = await supabaseClient.from('produtos').delete().eq('id', id);
+        if (error) {
+          alert("Erro ao eliminar produto: " + error.message);
+        } else {
+          setProdutos(prev => prev.filter(p => p.id !== id));
+          setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' });
+          carregarTudoEmParalelo(compTarget);
+        }
+      }
+
+      // 3. ADIÇÃO DE INSUMO NA FICHA TÉCNICA (CORRIGIDA)
+      async function handleAdicionarInsumo(e) {
+        e.preventDefault();
+        if (!modalFichaTecnica.produto) return;
+        const prod = modalFichaTecnica.produto;
+        let listaAtual = [];
+        if (Array.isArray(prod.ingredientes)) {
+          listaAtual = prod.ingredientes;
+        } else if (typeof prod.ingredientes === 'string') {
+          try { listaAtual = JSON.parse(prod.ingredientes); } catch(err) { listaAtual = []; }
+        }
+
+        const rawCusto = String(novoInsumo.custo).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+        const item = { 
+          id: Date.now().toString(), 
+          nome: novoInsumo.nome.trim(), 
+          quantidade: novoInsumo.quantidade.trim(), 
+          custo: parseFloat(rawCusto) || 0 
+        };
+
+        const novaLista = [...listaAtual, item];
+        const novoCustoTotal = novaLista.reduce((acc, curr) => acc + (Number(curr.custo) || 0), 0);
+
+        const { error } = await supabaseClient
+          .from('produtos')
+          .update({ ingredientes: novaLista, custo_unitario: novoCustoTotal })
+          .eq('id', prod.id);
+
+        if (error) {
+          alert("Erro ao adicionar ingrediente: " + error.message);
+        } else {
+          const prodAtualizado = { ...prod, ingredientes: novaLista, custo_unitario: novoCustoTotal };
+          setModalFichaTecnica({ aberto: true, produto: prodAtualizado });
+          setProdutos(prev => prev.map(p => p.id === prod.id ? prodAtualizado : p));
+          setNovoInsumo({ nome: '', quantidade: '', custo: '' });
+          carregarTudoEmParalelo(effectiveCompanyId);
+        }
+      }
+
+      // REMOÇÃO DE INSUMO NA FICHA TÉCNICA
+      async function handleRemoverInsumo(insumoId) {
+        if (!modalFichaTecnica.produto) return;
+        const prod = modalFichaTecnica.produto;
+        let listaAtual = Array.isArray(prod.ingredientes) ? prod.ingredientes : [];
+        const novaLista = listaAtual.filter(i => i.id !== insumoId);
+        const novoCustoTotal = novaLista.reduce((acc, curr) => acc + (Number(curr.custo) || 0), 0);
+
+        const { error } = await supabaseClient
+          .from('produtos')
+          .update({ 
+            ingredientes: novaLista, 
+            custo_unitario: novaLista.length > 0 ? novoCustoTotal : prod.custo_unitario 
+          })
+          .eq('id', prod.id);
+
+        if (error) {
+          alert("Erro ao remover ingrediente: " + error.message);
+        } else {
+          const prodAtualizado = { 
+            ...prod, 
+            ingredientes: novaLista, 
+            custo_unitario: novaLista.length > 0 ? novoCustoTotal : prod.custo_unitario 
+          };
+          setModalFichaTecnica({ aberto: true, produto: prodAtualizado });
+          setProdutos(prev => prev.map(p => p.id === prod.id ? prodAtualizado : p));
+          carregarTudoEmParalelo(effectiveCompanyId);
+        }
+      }
+
+      async function handleExecutarFechamento() {
+        if (lancamentosAtivos.length === 0) return alert("Não existem lançamentos ativos para fechar.");
+        const dataAtual = new Date();
+        const mesAno = `${dataAtual.getMonth() + 1}/${dataAtual.getFullYear()}`;
+        if (!window.confirm(`Confirma o encerramento do mês ${mesAno}?\nO painel e os lançamentos serão zerados para o próximo ciclo.`)) return;
+
+        setProcessandoFechamento(true);
+        const compTarget = effectiveCompanyId || 'cozinha-brasileira';
+
+        await supabaseClient.from('fechamentos').insert([{ 
+          company_id: compTarget, 
+          mes_ano: mesAno, 
+          relatorio: { faturamento, despesas: totalDespesas, lucro: resultadoMes, totalPratos, totalBebidas, ingredientes: arrayIngredientes, totalRegistros: lancamentosAtivos.length } 
+        }]);
+
+        const ids = lancamentosAtivos.map(l => l.id);
+        await supabaseClient.from('lancamentos').update({ status: 'arquivado' }).in('id', ids);
+
+        alert("Fechamento concluído com sucesso!");
+        carregarTudoEmParalelo(compTarget);
+        setProcessandoFechamento(false);
+      }
+
+      const fetchCompanies = async () => {
+        const { data } = await supabaseClient.from('companies').select('*').order('created_at', { ascending: false });
+        if (data) setCompaniesList(data);
+      };
+
+      const handleCreateCompanyB2B = async (e) => {
+        e.preventDefault();
+        const cleanName = newCompanyName.trim();
+        let cleanSlug = newCompanySlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+        if (!cleanSlug) cleanSlug = cleanName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-');
+
+        await supabaseClient.from('companies').insert([{ company_id: cleanSlug, company_name: cleanName, contact_phone: newCompanyPhone.trim(), status: 'ativo' }]);
+        await supabaseClient.from('app_users').insert([{ username: newCompanyAdminUser.trim().toLowerCase(), password: newCompanyAdminPass.trim(), role: 'admin', company_id: cleanSlug }]);
+
+        alert(`Restaurante "${cleanName}" registrado!`);
+        setNewCompanyName(''); setNewCompanySlug(''); setNewCompanyPhone(''); setNewCompanyAdminUser(''); setNewCompanyAdminPass('');
+        fetchCompanies();
+      };
+
+      const handleToggleCompanyStatus = async (id, currentStatus) => {
+        await supabaseClient.from('companies').update({ status: currentStatus === 'ativo' ? 'bloqueado' : 'ativo' }).eq('id', id);
+        fetchCompanies();
+      };
+
+      const handleAvatarUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file || !currentUser) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = async () => {
+            const canvas = document.createElement('canvas');
+            const maxSize = 250;
+            let width = img.width, height = img.height;
+            if (width > height) { if (width > maxSize) { height = Math.round((height * maxSize) / width); width = maxSize; } }
+            else { if (height > maxSize) { width = Math.round((width * maxSize) / height); height = maxSize; } }
+            canvas.width = width; canvas.height = height;
+            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+            
+            const updatedUser = { ...currentUser, avatar_url: compressedBase64 };
+            setCurrentUser(updatedUser);
+            localStorage.setItem('foodstrick_master_session', JSON.stringify(updatedUser));
+            await supabaseClient.from('app_users').update({ avatar_url: compressedBase64 }).eq('username', currentUser.username);
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      };
+
+      const handleRemoveAvatar = async () => {
+        if (!currentUser) return;
+        const updatedUser = { ...currentUser, avatar_url: null };
+        setCurrentUser(updatedUser);
+        localStorage.setItem('foodstrick_master_session', JSON.stringify(updatedUser));
+        await supabaseClient.from('app_users').update({ avatar_url: null }).eq('username', currentUser.username);
+      };
+
+      const isSupportSessionActive = Boolean(impersonatedCompany || adminInsideNotification);
+
+      useEffect(() => {
+        if (isAuthenticated && abaAtiva === 'cardapio' && effectiveCompanyId && effectiveCompanyId !== 'foodstrick-master') {
+          carregarConfiguracaoCardapio(effectiveCompanyId);
+        }
+      }, [isAuthenticated, abaAtiva, effectiveCompanyId]);
+
+      useEffect(() => {
+        if (isAuthenticated && abaAtiva === 'pedidos' && effectiveCompanyId && effectiveCompanyId !== 'foodstrick-master') {
+          carregarPedidosOnline();
+        }
+      }, [isAuthenticated, abaAtiva, effectiveCompanyId]);
+
+      async function carregarPedidosOnline() {
+        if (!currentUser || !effectiveCompanyId) return;
+        setPedidosLoading(true);
+        setPedidosError('');
+        try {
+          const { data, error } = await supabaseClient.rpc('foodstrick_list_orders_for_user', {
+            p_username: currentUser.username,
+            p_password: password,
+            p_company_id: effectiveCompanyId
+          });
+          if (error) throw error;
+          setPedidosOnline(Array.isArray(data) ? data : (data?.orders || []));
+        } catch (error) {
+          console.error('Erro ao carregar pedidos online:', error);
+          setPedidosError(password ? (error.message || 'Não foi possível carregar os pedidos.') : 'Por segurança, entre novamente na sua conta para consultar os pedidos após atualizar a página.');
+          setPedidosOnline([]);
+        } finally {
+          setPedidosLoading(false);
+        }
+      }
+
+      async function atualizarStatusPedido(pedidoId, novoStatus) {
+        if (!currentUser || !effectiveCompanyId) return;
+        setPedidoAtualizando(pedidoId);
+        setPedidosError('');
+        try {
+          const { data, error } = await supabaseClient.rpc('foodstrick_update_order_status_for_user', {
+            p_username: currentUser.username,
+            p_password: password,
+            p_company_id: effectiveCompanyId,
+            p_order_id: pedidoId,
+            p_status: novoStatus
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          await carregarPedidosOnline();
+        } catch (error) {
+          console.error('Erro ao atualizar pedido:', error);
+          setPedidosError(error.message || 'Não foi possível atualizar o status do pedido.');
+        } finally {
+          setPedidoAtualizando(null);
+        }
+      }
+
+      const statusPedidoLabel = status => ({ pending: 'Pendente', accepted: 'Aceito', preparing: 'Em preparo', ready: 'Pronto', completed: 'Concluído', rejected: 'Recusado', cancelled: 'Cancelado' }[status] || status || 'Pendente');
+      const statusPedidoClass = status => ({ pending: 'bg-amber-950 text-amber-300 border-amber-900', accepted: 'bg-blue-950 text-blue-300 border-blue-900', preparing: 'bg-purple-950 text-purple-300 border-purple-900', ready: 'bg-emerald-950 text-emerald-300 border-emerald-900', completed: 'bg-zinc-800 text-zinc-300 border-zinc-700', rejected: 'bg-red-950 text-red-300 border-red-900', cancelled: 'bg-red-950 text-red-300 border-red-900' }[status] || 'bg-zinc-800 text-zinc-300 border-zinc-700');
+
+      const navegarPara = (aba) => {
+        setAbaAtiva(aba);
+        setMobileMenuOpen(false);
+      };
+
+      // ==========================
+      // TELA DE LOGIN
+      // ==========================
+      if (!isAuthenticated) {
+        return (
+          <div className="min-h-screen w-full flex items-center justify-center md:justify-start p-4 sm:p-6 md:p-16 lg:p-24 relative bg-cover bg-center" style={{ backgroundImage: `url("${LOGIN_BG_IMAGE}")` }}>
+            <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" />
+            <div className="relative z-10 w-full max-w-sm bg-[#161616] rounded-2xl shadow-2xl border border-[#2d2d2d] p-6 sm:p-8 text-white">
+              <div className="flex items-center gap-3 pb-5 border-b border-[#2d2d2d] mb-5">
+                <div className="w-12 h-12 rounded-xl bg-[#D95B1E] flex items-center justify-center text-white shadow-lg shadow-[#D95B1E]/30 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+                </div>
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-black italic tracking-wider text-white">FoodStrick</h1>
+                  <p className="text-[10px] text-[#D95B1E] font-bold uppercase tracking-widest">SaaS Master Access</p>
+                </div>
+              </div>
+              {authError && <div className="mb-4 p-3 bg-red-950/60 border border-red-800 text-red-300 rounded-lg text-xs font-medium text-center">{authError}</div>}
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">Usuário</label>
+                  <input type="text" placeholder="admin ou cozinha" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full bg-[#202020] text-white text-base md:text-sm px-4 py-3 md:py-2.5 rounded-lg border border-[#333] focus:border-[#D95B1E] outline-none" required />
+                </div>
+                <div className="relative">
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">Senha</label>
+                  <input type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-[#202020] text-white text-base md:text-sm px-4 py-3 md:py-2.5 pr-10 rounded-lg border border-[#333] focus:border-[#D95B1E] outline-none" required />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-8 md:top-8 text-zinc-400 hover:text-white p-1">
+                    {showPassword ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    )}
+                  </button>
+                </div>
+                <button type="submit" className="w-full btn-orange font-bold py-3.5 md:py-3 rounded-lg text-sm tracking-wide shadow-lg transition-all mt-2 active:scale-95">Acessar Sistema</button>
+              </form>
+            </div>
+          </div>
+        );
+      }
+
+      // SISTEMA PRINCIPAL
+      return (
+        <div className="flex flex-col md:flex-row min-h-screen relative">
+          
+          {/* HEADER MOBILE */}
+          <header className="md:hidden sticky top-0 z-40 bg-[#141414] border-b border-[#242424] px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-[#D95B1E] flex items-center justify-center text-white shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+              </div>
+              <div className="overflow-hidden">
+                <span className="text-sm font-black text-white block leading-tight">FoodStrick</span>
+                <span className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider block truncate max-w-[170px]">{effectiveCompanyName}</span>
+              </div>
+            </div>
+
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-zinc-300 hover:text-white bg-[#202020] border border-[#333] rounded-lg transition-colors" title="Menu">
+              {mobileMenuOpen ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+              )}
+            </button>
+          </header>
+
+          {/* GAVETA MOBILE */}
+          {mobileMenuOpen && (
+            <div className="md:hidden fixed inset-0 z-30 bg-black/80 backdrop-blur-sm pt-16 flex flex-col justify-between p-5 animate-in fade-in duration-150">
+              <nav className="space-y-2 mt-2">
+                {(!isSuperAdmin || impersonatedCompany) && (
+                  <>
+                    <button onClick={() => navegarPara('painel')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${abaAtiva === 'painel' ? 'btn-orange shadow-md' : 'text-zinc-300 bg-[#1a1a1a]'}`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                      Painel Geral
+                    </button>
+                    <button onClick={() => navegarPara('lancamentos')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${abaAtiva === 'lancamentos' ? 'btn-orange shadow-md' : 'text-zinc-300 bg-[#1a1a1a]'}`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17V7"/></svg>
+                      Lançamentos
+                    </button>
+                    <button onClick={() => navegarPara('produtos')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${abaAtiva === 'produtos' ? 'btn-orange shadow-md' : 'text-zinc-300 bg-[#1a1a1a]'}`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                      Produtos & Custos
+                    </button>
+                    <button onClick={() => navegarPara('fichas')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${abaAtiva === 'fichas' ? 'btn-orange shadow-md' : 'text-zinc-300 bg-[#1a1a1a]'}`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
+                      Fichas Técnicas
+                    </button>
+                    <button onClick={() => navegarPara('fechamento')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${abaAtiva === 'fechamento' ? 'btn-orange shadow-md' : 'text-zinc-300 bg-[#1a1a1a]'}`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
+                      Fechamento Mensal
+                    </button>
+                    <button onClick={() => navegarPara('pedidos')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${abaAtiva === 'pedidos' ? 'btn-orange shadow-md' : 'text-zinc-300 bg-[#1a1a1a]'}`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2h12v20l-2-1-2 1-2-1-2 1-2-1-2 1V2Z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
+                      Pedidos Online {pedidosOnline.filter(p => p.status === 'pending').length > 0 && <span className="ml-auto rounded-full bg-red-600 px-2 py-0.5 text-[10px] text-white">{pedidosOnline.filter(p => p.status === 'pending').length}</span>}
+                    </button>
+                    <button onClick={() => navegarPara('cardapio')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${abaAtiva === 'cardapio' ? 'btn-orange shadow-md' : 'text-zinc-300 bg-[#1a1a1a]'}`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2v6a4 4 0 0 0 4 4h1"/><path d="M7 2v4"/><path d="M11 2v4"/><path d="M7 12v10"/><path d="M18 8v14"/><path d="M14 8h8l-1 5h-6z"/></svg>
+                      Cardápio Online
+                    </button>
+                  </>
+                )}
+                <button onClick={() => navegarPara('configuracoes')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${abaAtiva === 'configuracoes' ? 'bg-[#2a2a2a] text-white border border-[#444]' : 'text-zinc-300 bg-[#1a1a1a]'}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                  Configurações
+                </button>
+              </nav>
+
+              <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 p-3.5 rounded-xl bg-red-950/40 text-red-400 font-bold text-sm border border-red-900/40 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                Terminar Sessão ({currentUser?.username})
+              </button>
+            </div>
+          )}
+
+          {/* NOTIFICAÇÃO AUDITORIA */}
+          {adminInsideNotification && (
+            <div className="fixed top-14 md:top-4 left-3 right-3 md:left-72 z-40 p-3 bg-blue-950/95 border border-blue-500/60 rounded-xl flex items-center justify-between text-xs text-blue-200 shadow-2xl backdrop-blur-md">
+              <div className="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 shrink-0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
+                <span className="truncate"><strong>Suporte Conectado:</strong> {adminInsideNotification}</span>
+              </div>
+              <span className="bg-blue-900 text-blue-300 px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0">Ativo</span>
+            </div>
+          )}
+
+          {/* MODAL EXCLUSÃO LANÇAMENTO */}
+          {modalExclusao.aberto && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+              <div className="bg-[#171717] border border-[#333] rounded-xl p-5 sm:p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+                <h3 className="text-lg font-bold text-white mb-2">Excluir Lançamento</h3>
+                <p className="text-xs text-zinc-400 mb-5">Indique o motivo da exclusão:</p>
+                <div className="space-y-2 mb-6">
+                  {['Pedido cancelado', 'Erro de principiante', 'Erro técnico', 'Outro'].map(motivo => (
+                    <label key={motivo} className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${motivoExclusao === motivo ? 'border-[#D95B1E] bg-[#D95B1E]/10' : 'border-[#2d2d2d] hover:bg-[#202020]'}`}>
+                      <input type="radio" name="motivo" value={motivo} checked={motivoExclusao === motivo} onChange={(e) => setMotivoExclusao(e.target.value)} className="text-[#D95B1E]" />
+                      <span className="ml-3 text-xs text-white font-medium">{motivo}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => setModalExclusao({ aberto: false, idLancamento: null })} className="px-4 py-2.5 text-xs font-semibold text-zinc-400 hover:text-white">Cancelar</button>
+                  <button onClick={confirmarExclusao} className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold">Confirmar</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL FICHA TÉCNICA (OPÇÃO 1) */}
+          {modalFichaTecnica.aberto && modalFichaTecnica.produto && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
+              <div className="bg-[#161616] border border-[#2d2d2d] rounded-2xl p-4 sm:p-6 w-full max-w-2xl shadow-2xl my-auto max-h-[92vh] overflow-y-auto">
+                <div className="flex items-center justify-between pb-4 border-b border-[#262626] mb-5">
+                  <div className="flex items-center gap-2.5 overflow-hidden">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-950/60 border border-emerald-800/50 flex items-center justify-center text-emerald-400 shrink-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
+                    </div>
+                    <div className="truncate">
+                      <h3 className="text-sm sm:text-base font-bold text-white truncate">{modalFichaTecnica.produto.nome}</h3>
+                      <p className="text-[10px] sm:text-xs text-zinc-400">Ficha técnica e custos</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setModalFichaTecnica({ aberto: false, produto: null })} className="p-1.5 text-zinc-400 hover:text-white rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                  </button>
+                </div>
+
+                {(() => {
+                  const ingList = Array.isArray(modalFichaTecnica.produto.ingredientes) ? modalFichaTecnica.produto.ingredientes : [];
+                  const somaCusto = ingList.reduce((acc, curr) => acc + Number(curr.custo || 0), 0);
+                  const precoVenda = Number(modalFichaTecnica.produto.preco_venda || 0);
+                  const margemRs = precoVenda - (ingList.length > 0 ? somaCusto : Number(modalFichaTecnica.produto.custo_unitario || 0));
+                  const margemPct = precoVenda > 0 ? ((margemRs / precoVenda) * 100).toFixed(1) : 0;
+
+                  return (
+                    <div>
+                      <div className="grid grid-cols-3 gap-2 mb-4">
+                        <div className="bg-[#202020] border border-[#2d2d2d] p-2.5 rounded-xl text-center sm:text-left">
+                          <span className="text-[9px] uppercase font-bold text-zinc-400 block">Insumos</span>
+                          <span className="text-sm sm:text-lg font-bold text-white">{ingList.length}</span>
+                        </div>
+                        <div className="bg-[#202020] border border-[#2d2d2d] p-2.5 rounded-xl text-center sm:text-left">
+                          <span className="text-[9px] uppercase font-bold text-zinc-400 block">Custo Total</span>
+                          <span className="text-sm sm:text-lg font-bold text-emerald-400">R$ {somaCusto.toFixed(2)}</span>
+                        </div>
+                        <div className="bg-[#202020] border border-[#2d2d2d] p-2.5 rounded-xl text-center sm:text-left">
+                          <span className="text-[9px] uppercase font-bold text-zinc-400 block">Margem</span>
+                          <span className="text-sm sm:text-lg font-bold text-[#D95B1E]">{margemPct}%</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-[#1c1c1c] border border-[#262626] rounded-xl overflow-hidden mb-4">
+                        <div className="px-3 py-2 border-b border-[#262626] flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-white uppercase">Ingredientes</span>
+                          <span className="text-[10px] text-emerald-400 font-mono">R$ {somaCusto.toFixed(2)}</span>
+                        </div>
+
+                        {ingList.length === 0 ? (
+                          <div className="p-5 text-center text-xs text-zinc-500 italic">Nenhum ingrediente adicionado ainda.</div>
+                        ) : (
+                          <div className="max-h-40 overflow-y-auto divide-y divide-[#262626]">
+                            {ingList.map((insumo, index) => (
+                              <div key={insumo.id || index} className="px-3 py-2 flex items-center justify-between text-xs">
+                                <div className="truncate pr-2">
+                                  <span className="text-white font-medium block truncate">{insumo.nome}</span>
+                                  <span className="text-[10px] text-zinc-400">{insumo.quantidade}</span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="font-mono text-white">R$ {Number(insumo.custo).toFixed(2)}</span>
+                                  <button onClick={() => handleRemoverInsumo(insumo.id)} className="p-1 text-zinc-500 hover:text-red-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <form onSubmit={handleAdicionarInsumo} className="bg-[#202020] border border-[#2d2d2d] p-3.5 rounded-xl space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                          <div>
+                            <label className="block text-[10px] font-medium text-zinc-400 mb-1">Ingrediente</label>
+                            <input type="text" placeholder="Ex: Pão, Carne..." value={novoInsumo.nome} onChange={(e) => setNovoInsumo({ ...novoInsumo, nome: e.target.value })} className="w-full bg-[#161616] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none focus:border-emerald-500" required />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-medium text-zinc-400 mb-1">Quantidade</label>
+                            <input type="text" placeholder="Ex: 1 un, 150g..." value={novoInsumo.quantidade} onChange={(e) => setNovoInsumo({ ...novoInsumo, quantidade: e.target.value })} className="w-full bg-[#161616] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none focus:border-emerald-500" required />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-medium text-zinc-400 mb-1">Custo (R$)</label>
+                            <input type="text" placeholder="0.00" value={novoInsumo.custo} onChange={(e) => setNovoInsumo({ ...novoInsumo, custo: e.target.value })} className="w-full bg-[#161616] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none focus:border-emerald-500" required />
+                          </div>
+                        </div>
+                        <div className="flex justify-end pt-1">
+                          <button type="submit" className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-lg text-xs shadow-md">Adicionar à Ficha</button>
+                        </div>
+                      </form>
+
+                      <div className="flex justify-end pt-4">
+                        <button type="button" onClick={() => setModalFichaTecnica({ aberto: false, produto: null })} className="w-full sm:w-auto px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-semibold">Concluir</button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* MODAL EDITAR PRODUTO (OPÇÃO 2) */}
+          {modalEditarProduto.aberto && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+              <div className="bg-[#171717] border border-[#333] rounded-xl p-5 sm:p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+                <h3 className="text-lg font-bold text-white mb-2">Editar Produto & Preços</h3>
+                <form onSubmit={handleAtualizarProduto} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">Nome</label>
+                    <input type="text" value={modalEditarProduto.nome} onChange={(e) => setModalEditarProduto({ ...modalEditarProduto, nome: e.target.value })} className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 md:p-2.5 text-base md:text-xs text-white outline-none focus:border-[#D95B1E]" required />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Preço Venda (R$)</label>
+                      <input type="text" value={modalEditarProduto.preco_venda} onChange={(e) => setModalEditarProduto({ ...modalEditarProduto, preco_venda: e.target.value })} className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 md:p-2.5 text-base md:text-xs text-white outline-none focus:border-[#D95B1E]" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Custo Insumo (R$)</label>
+                      <input type="text" value={modalEditarProduto.custo_unitario} onChange={(e) => setModalEditarProduto({ ...modalEditarProduto, custo_unitario: e.target.value })} className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 md:p-2.5 text-base md:text-xs text-white outline-none focus:border-[#D95B1E]" required />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">Observação</label>
+                    <input type="text" value={modalEditarProduto.observacao} onChange={(e) => setModalEditarProduto({ ...modalEditarProduto, observacao: e.target.value })} className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 md:p-2.5 text-base md:text-xs text-white outline-none focus:border-[#D95B1E]" />
+                  </div>
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button type="button" onClick={() => setModalEditarProduto({ aberto: false, id: null, nome: '', preco_venda: '', custo_unitario: '', observacao: '' })} className="px-4 py-2.5 text-xs font-semibold text-zinc-400">Cancelar</button>
+                    <button type="submit" className="px-5 py-2.5 btn-orange rounded-lg text-xs font-bold">Salvar Alterações</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL EXCLUIR PRODUTO (OPÇÃO 3) */}
+          {modalExcluirProduto.aberto && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+              <div className="bg-[#171717] border border-[#333] rounded-xl p-5 sm:p-6 w-full max-w-md shadow-2xl">
+                <h3 className="text-lg font-bold text-white mb-2">Eliminar Produto</h3>
+                <p className="text-xs text-zinc-400 mb-6">Pretende remover <strong className="text-white">"{modalExcluirProduto.nome}"</strong> da sua lista?</p>
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => setModalExcluirProduto({ aberto: false, idProduto: null, nome: '' })} className="px-4 py-2.5 text-xs font-semibold text-zinc-400">Cancelar</button>
+                  <button onClick={() => deletarProduto(modalExcluirProduto.idProduto)} className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold">Eliminar</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SIDEBAR DESKTOP */}
+          <aside className="hidden md:flex w-64 bg-[#141414] border-r border-[#242424] p-5 flex-col justify-between shrink-0 h-screen sticky top-0 overflow-y-auto z-20">
+            <div>
+              <div className="flex items-center gap-3 pb-6 border-b border-[#242424]">
+                <div className="w-10 h-10 rounded-xl bg-[#D95B1E] flex items-center justify-center text-white shadow-md shadow-[#D95B1E]/30 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+                </div>
+                <div className="overflow-hidden">
+                  <h2 className="text-lg font-black tracking-tight text-white">FoodStrick</h2>
+                  <span className="text-[10px] text-zinc-500 font-semibold uppercase tracking-widest block truncate" title={effectiveCompanyName}>
+                    {effectiveCompanyName}
+                  </span>
+                </div>
+              </div>
+
+              {(!isSuperAdmin || impersonatedCompany) && (
+                <nav className="mt-6 space-y-1.5">
+                  <button onClick={() => setAbaAtiva('painel')} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'painel' ? 'btn-orange shadow-md' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                    Painel Geral
+                  </button>
+                  <button onClick={() => setAbaAtiva('lancamentos')} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'lancamentos' ? 'btn-orange shadow-md' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17V7"/></svg>
+                    Lançamentos
+                  </button>
+                  <button onClick={() => setAbaAtiva('produtos')} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'produtos' ? 'btn-orange shadow-md' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                    Produtos & Custos
+                  </button>
+                  <button onClick={() => setAbaAtiva('fichas')} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'fichas' ? 'btn-orange shadow-md' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
+                    Fichas Técnicas
+                  </button>
+                  <button onClick={() => setAbaAtiva('fechamento')} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'fechamento' ? 'btn-orange shadow-md' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
+                    Fechamento Mensal
+                  </button>
+                  <button onClick={() => navegarPara('pedidos')} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'pedidos' ? 'btn-orange shadow-md' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2h12v20l-2-1-2 1-2-1-2 1-2-1-2 1V2Z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
+                    Pedidos Online
+                    {pedidosOnline.filter(p => p.status === 'pending').length > 0 && <span className="ml-auto rounded-full bg-red-600 px-1.5 py-0.5 text-[9px] text-white">{pedidosOnline.filter(p => p.status === 'pending').length}</span>}
+                  </button>
+                  <button onClick={() => navegarPara('cardapio')} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'cardapio' ? 'btn-orange shadow-md' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2v6a4 4 0 0 0 4 4h1"/><path d="M7 2v4"/><path d="M11 2v4"/><path d="M7 12v10"/><path d="M18 8v14"/><path d="M14 8h8l-1 5h-6z"/></svg>
+                    Cardápio Online
+                  </button>
+                </nav>
+              )}
+            </div>
+
+            <div className="pt-4 border-t border-[#242424] space-y-2">
+              <button onClick={() => setAbaAtiva('configuracoes')} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${abaAtiva === 'configuracoes' ? 'bg-[#262626] text-white' : 'text-zinc-400 hover:bg-[#202020] hover:text-white'}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                Configurações
+              </button>
+              <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-xs font-medium text-zinc-500 hover:text-red-400 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                Terminar Sessão ({currentUser?.username})
+              </button>
+            </div>
+          </aside>
+
+          {/* SUB-SIDEBAR DESKTOP */}
+          {abaAtiva === 'configuracoes' && (
+            <aside className="w-56 bg-[#111111] border-r border-[#242424] p-5 shrink-0 hidden md:block h-screen sticky top-0 overflow-y-auto z-10">
+              <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4">Ajustes & Gestão</h3>
+              <nav className="space-y-1">
+                {(!isSuperAdmin || impersonatedCompany) && (
+                  <button onClick={() => setSubAbaConfig('exclusoes')} className={`w-full text-left px-3 py-2 rounded-md text-xs font-medium ${subAbaConfig === 'exclusoes' ? 'bg-[#202020] text-[#D95B1E]' : 'text-zinc-400 hover:text-white'}`}>
+                    Exclusões (Lixeira)
+                  </button>
+                )}
+                <button onClick={() => setSubAbaConfig('conta')} className={`w-full text-left px-3 py-2 rounded-md text-xs font-medium ${subAbaConfig === 'conta' ? 'bg-[#202020] text-white' : 'text-zinc-400 hover:text-white'}`}>
+                  Minha Conta & Sessão
+                </button>
+                {isSuperAdmin && (
+                  <button onClick={() => { setSubAbaConfig('empresas'); fetchCompanies(); }} className={`w-full text-left px-3 py-2 rounded-md text-xs font-bold flex items-center gap-2 ${subAbaConfig === 'empresas' ? 'bg-blue-950/40 text-blue-400 border border-blue-900/50' : 'text-blue-400/70 hover:text-blue-300'}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>
+                    Gestão de Cozinhas (B2B)
+                  </button>
+                )}
+              </nav>
+            </aside>
+          )}
+
+          {/* CONTEÚDO PRINCIPAL */}
+          <main className="flex-1 bg-[#0f0f0f] p-4 sm:p-6 md:p-10 overflow-y-auto">
+
+            {impersonatedCompany && (
+              <div className="mb-4 sm:mb-6 p-3 bg-amber-500/15 border border-amber-500/40 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-amber-300">
+                <span><strong>[Modo Suporte Ativo]:</strong> {impersonatedCompany.company_name}</span>
+                <button onClick={handleStopImpersonation} className="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-black font-bold px-3 py-1.5 rounded-lg text-xs shadow-md">
+                  Voltar ao Painel Master
+                </button>
+              </div>
+            )}
+
+            {isSuperAdmin && !impersonatedCompany && abaAtiva !== 'configuracoes' && (
+              <div className="max-w-xl bg-[#161616] p-6 sm:p-8 rounded-xl border border-[#2d2d2d] text-center mx-auto mt-6">
+                <h2 className="text-lg sm:text-xl font-bold text-white mb-2">Painel Global FoodStrick Master</h2>
+                <p className="text-zinc-400 text-xs sm:text-sm mb-5">Aceda à secção de Configurações para gerir as cozinhas registadas.</p>
+                <button onClick={() => { setAbaAtiva('configuracoes'); setSubAbaConfig('empresas'); }} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-6 rounded-lg text-sm">
+                  Abrir Gestão B2B
+                </button>
+              </div>
+            )}
+
+            {/* 1. ABA PAINEL GERAL */}
+            {abaAtiva === 'painel' && (!isSuperAdmin || impersonatedCompany) && (
+              <div className="max-w-6xl">
+                <header className="mb-5 sm:mb-8">
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">Painel Gerencial</h1>
+                  <p className="text-[11px] sm:text-xs text-zinc-400">Visão consolidada de vendas, margens e despesas</p>
+                </header>
+
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 mb-6 sm:mb-8">
+                  <div className="bg-[#161616] border border-[#262626] p-3.5 sm:p-5 rounded-xl">
+                    <span className="text-[10px] sm:text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">Faturamento</span>
+                    <p className="text-base sm:text-2xl font-bold text-white mt-1">R$ {faturamento.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-[#161616] border border-[#262626] p-3.5 sm:p-5 rounded-xl">
+                    <span className="text-[10px] sm:text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">Lucro Produtos</span>
+                    <p className="text-base sm:text-2xl font-bold text-emerald-400 mt-1">R$ {lucroProdutos.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-[#161616] border border-[#262626] p-3.5 sm:p-5 rounded-xl">
+                    <span className="text-[10px] sm:text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">Despesas</span>
+                    <p className="text-base sm:text-2xl font-bold text-red-500 mt-1">R$ {totalDespesas.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-[#161616] border border-[#262626] p-3.5 sm:p-5 rounded-xl">
+                    <span className="text-[10px] sm:text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">Resultado</span>
+                    <p className={`text-base sm:text-2xl font-bold mt-1 ${resultadoMes >= 0 ? 'text-[#D95B1E]' : 'text-red-500'}`}>R$ {resultadoMes.toFixed(2)}</p>
+                  </div>
+                </div>
+
+                <div className="bg-[#161616] border border-[#262626] rounded-xl p-4 sm:p-5 overflow-hidden shadow-sm">
+                  <h2 className="text-xs sm:text-sm font-bold text-white mb-3">Últimos Lançamentos</h2>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs text-zinc-400 min-w-[550px]">
+                      <thead className="border-b border-[#262626]">
+                        <tr>
+                          <th className="pb-2.5 uppercase">Data</th>
+                          <th className="pb-2.5 uppercase">Tipo</th>
+                          <th className="pb-2.5 uppercase">Descrição</th>
+                          <th className="pb-2.5 uppercase text-center">Qtd</th>
+                          <th className="pb-2.5 uppercase">Canal</th>
+                          <th className="pb-2.5 uppercase text-right">Valor</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#262626]">
+                        {lancamentosAtivos.slice(0, 10).map(l => (
+                          <tr key={l.id} className="hover:bg-[#1c1c1c]">
+                            <td className="py-2.5">{l.data}</td>
+                            <td className="py-2.5"><span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${l.tipo === 'Venda' ? 'bg-emerald-950/60 text-emerald-400' : 'bg-red-950/60 text-red-400'}`}>{l.tipo}</span></td>
+                            <td className="py-2.5 text-white font-medium truncate max-w-[150px]">{l.descricao}{l.fornecedor && <span className="text-[10px] text-zinc-500 block">Forn: {l.fornecedor}</span>}</td>
+                            <td className="py-2.5 text-center text-white">{l.quantidade || '-'}</td>
+                            <td className="py-2.5">{l.canal_categoria}</td>
+                            <td className="py-2.5 text-right font-bold text-white">R$ {Number(l.valor_total).toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 2. ABA LANÇAMENTOS */}
+            {abaAtiva === 'lancamentos' && (!isSuperAdmin || impersonatedCompany) && (
+              <div className="max-w-6xl">
+                <header className="mb-5"><h1 className="text-xl sm:text-2xl font-bold text-white">Novo Lançamento</h1></header>
+                <form onSubmit={handleSalvarLancamento} className="bg-[#161616] border border-[#262626] p-4 sm:p-6 rounded-xl mb-6 space-y-3 sm:space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-medium text-zinc-400 mb-1">Operação</label>
+                      <select value={novoLancamento.tipo} onChange={e => setNovoLancamento({...novoLancamento, tipo: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none">
+                        <option>Venda</option><option>Despesa</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-zinc-400 mb-1">Data</label>
+                      <input type="date" value={novoLancamento.data} onChange={e => setNovoLancamento({...novoLancamento, data: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
+                    </div>
+                    {novoLancamento.tipo === 'Venda' ? (
+                      <div className="sm:col-span-2">
+                        <label className="block text-[11px] font-medium text-zinc-400 mb-1">Produto</label>
+                        <select value={novoLancamento.produto_id} onChange={e => setNovoLancamento({...novoLancamento, produto_id: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required>
+                          <option value="">Selecione o produto...</option>
+                          {produtos.map(p => <option key={p.id} value={p.id}>{p.nome} (R$ {Number(p.preco_venda).toFixed(2)})</option>)}
+                        </select>
+                      </div>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="block text-[11px] font-medium text-zinc-400 mb-1">Descrição</label>
+                          <input type="text" placeholder="Ex: Insumos, contas..." value={novoLancamento.descricao} onChange={e => setNovoLancamento({...novoLancamento, descricao: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-medium text-zinc-400 mb-1">Fornecedor (Opcional)</label>
+                          <input type="text" value={novoLancamento.fornecedor} onChange={e => setNovoLancamento({...novoLancamento, fornecedor: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    {novoLancamento.tipo === 'Venda' ? (
+                      <div>
+                        <label className="block text-[11px] font-medium text-zinc-400 mb-1">Quantidade</label>
+                        <input type="number" min="1" value={novoLancamento.quantidade} onChange={e => setNovoLancamento({...novoLancamento, quantidade: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-[11px] font-medium text-zinc-400 mb-1">Valor (R$)</label>
+                        <input type="number" step="0.01" value={novoLancamento.valor_despesa} onChange={e => setNovoLancamento({...novoLancamento, valor_despesa: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-[11px] font-medium text-zinc-400 mb-1">Pagamento</label>
+                      <select value={novoLancamento.pagamento} onChange={e => setNovoLancamento({...novoLancamento, pagamento: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none">
+                        <option>Pix</option><option>Cartão</option><option>Dinheiro</option><option>Transferência</option><option>Outro</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-zinc-400 mb-1">Canal / Categoria</label>
+                      <select value={novoLancamento.canal_categoria} onChange={e => setNovoLancamento({...novoLancamento, canal_categoria: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none">
+                        <option>Delivery</option><option>Retirada</option><option>Evento</option><option>Insumos</option><option>Embalagens</option><option>Bebidas</option><option>Outros</option>
+                      </select>
+                    </div>
+                    <div className="flex items-end">
+                      <button type="submit" className="w-full btn-orange font-bold py-3 md:py-2.5 rounded-lg text-xs shadow-md">Registar Operação</button>
+                    </div>
+                  </div>
+                </form>
+
+                <div className="bg-[#161616] border border-[#262626] rounded-xl p-4 sm:p-5 overflow-hidden shadow-sm">
+                  <h2 className="text-xs sm:text-sm font-bold text-white mb-3">Histórico Completo</h2>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs text-zinc-400 min-w-[580px]">
+                      <thead className="border-b border-[#262626]">
+                        <tr>
+                          <th className="pb-2.5 uppercase">Data</th>
+                          <th className="pb-2.5 uppercase">Tipo</th>
+                          <th className="pb-2.5 uppercase">Descrição</th>
+                          <th className="pb-2.5 uppercase text-center">Qtd</th>
+                          <th className="pb-2.5 uppercase">Canal</th>
+                          <th className="pb-2.5 uppercase text-right">Valor</th>
+                          <th className="pb-2.5 uppercase text-center"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#262626]">
+                        {lancamentosAtivos.map(l => (
+                          <tr key={l.id} className="hover:bg-[#1c1c1c] group">
+                            <td className="py-2.5">{l.data}</td>
+                            <td className="py-2.5"><span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${l.tipo === 'Venda' ? 'bg-emerald-950/60 text-emerald-400' : 'bg-red-950/60 text-red-400'}`}>{l.tipo}</span></td>
+                            <td className="py-2.5 text-white font-medium">{l.descricao}{l.fornecedor && <span className="text-[10px] text-zinc-500 block">Forn: {l.fornecedor}</span>}</td>
+                            <td className="py-2.5 text-center text-white">{l.quantidade || '-'}</td>
+                            <td className="py-2.5">{l.canal_categoria}</td>
+                            <td className="py-2.5 text-right font-bold text-white">R$ {Number(l.valor_total).toFixed(2)}</td>
+                            <td className="py-2.5 text-center">
+                              <button onClick={() => setModalExclusao({ aberto: true, idLancamento: l.id })} className="p-1.5 text-zinc-500 hover:text-red-400 rounded">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 3. ABA PRODUTOS & CARDÁPIO */}
+            {abaAtiva === 'produtos' && (!isSuperAdmin || impersonatedCompany) && (
+              <div className="max-w-6xl">
+                <header className="mb-5"><h1 className="text-xl sm:text-2xl font-bold text-white">Produtos & Cardápio</h1></header>
+                <form onSubmit={handleSalvarProduto} className="bg-[#161616] border border-[#262626] p-4 sm:p-6 rounded-xl mb-6 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-medium text-zinc-400 mb-1">Nome do Item</label>
+                      <input type="text" value={novoProduto.nome} onChange={e => setNovoProduto({...novoProduto, nome: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-zinc-400 mb-1">Preço Venda (R$)</label>
+                      <input type="text" value={novoProduto.preco_venda} onChange={e => setNovoProduto({...novoProduto, preco_venda: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-zinc-400 mb-1">Custo Insumo (R$)</label>
+                      <input type="text" value={novoProduto.custo_unitario} onChange={e => setNovoProduto({...novoProduto, custo_unitario: e.target.value})} className="w-full bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
+                    </div>
+                    <div className="flex items-end">
+                      <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 md:py-2.5 rounded-lg text-xs shadow-md">Guardar Produto</button>
+                    </div>
+                  </div>
+                </form>
+
+                <div className="bg-[#161616] border border-[#262626] rounded-xl p-4 sm:p-5 overflow-hidden shadow-sm">
+                  <h2 className="text-xs sm:text-sm font-bold text-white mb-3">Itens Registados ({produtos.length})</h2>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs text-zinc-400 min-w-[580px]">
+                      <thead className="border-b border-[#262626]">
+                        <tr>
+                          <th className="pb-2.5 uppercase">Item</th>
+                          <th className="pb-2.5 uppercase">Preço Venda</th>
+                          <th className="pb-2.5 uppercase">Custo</th>
+                          <th className="pb-2.5 uppercase">Margem Bruta</th>
+                          <th className="pb-2.5 uppercase">Margem (%)</th>
+                          <th className="pb-2.5 uppercase text-right pr-2">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#262626]">
+                        {produtos.map(p => {
+                          const margem = Number(p.preco_venda) - Number(p.custo_unitario);
+                          const pct = p.preco_venda > 0 ? ((margem / p.preco_venda) * 100).toFixed(1) : 0;
+                          const totalIng = Array.isArray(p.ingredientes) ? p.ingredientes.length : 0;
+                          return (
+                            <tr key={p.id} className="hover:bg-[#1c1c1c]">
+                              <td className="py-2.5 text-white font-medium">
+                                {p.nome}
+                                {totalIng > 0 && (
+                                  <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-900/60">
+                                    {totalIng} insumos
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 text-white font-mono">R$ {Number(p.preco_venda).toFixed(2)}</td>
+                              <td className="py-2.5 font-mono">R$ {Number(p.custo_unitario).toFixed(2)}</td>
+                              <td className="py-2.5 font-bold text-emerald-400 font-mono">R$ {margem.toFixed(2)}</td>
+                              <td className="py-2.5 text-zinc-300 font-mono">{pct}%</td>
+                              <td className="py-2.5 text-right pr-2">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {/* BOTÃO 1: FICHA TÉCNICA (PRANCHETA) */}
+                                  <button 
+                                    onClick={() => setModalFichaTecnica({ aberto: true, produto: p })} 
+                                    className="p-1.5 text-zinc-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded transition-colors cursor-pointer" 
+                                    title="Abrir Ficha Técnica e Insumos"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
+                                  </button>
+
+                                  {/* BOTÃO 2: EDITAR PREÇOS (LÁPIS) */}
+                                  <button 
+                                    onClick={() => setModalEditarProduto({ aberto: true, id: p.id, nome: p.nome, preco_venda: p.preco_venda, custo_unitario: p.custo_unitario, observacao: p.observacao || '' })} 
+                                    className="p-1.5 text-zinc-400 hover:text-amber-400 hover:bg-amber-500/10 rounded transition-colors cursor-pointer" 
+                                    title="Editar Nome e Preços"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                                  </button>
+
+                                  {/* BOTÃO 3: ELIMINAR (LIXEIRA) */}
+                                  <button 
+                                    onClick={() => setModalExcluirProduto({ aberto: true, idProduto: p.id, nome: p.nome })} 
+                                    className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors cursor-pointer" 
+                                    title="Eliminar Produto"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ABA CARDÁPIO ONLINE */}
+            {abaAtiva === 'pedidos' && (!isSuperAdmin || impersonatedCompany) && (
+              <div className="max-w-6xl">
+                <header className="mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div><h1 className="text-xl sm:text-2xl font-bold text-white">Pedidos Online</h1><p className="text-xs text-zinc-400 mt-1">Pedidos enviados pelos clientes no cardápio público desta unidade.</p></div>
+                  <button onClick={carregarPedidosOnline} disabled={pedidosLoading} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#252525] hover:bg-[#333] border border-[#3a3a3a] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={pedidosLoading?'animate-spin':''}><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M5.6 9a7 7 0 0 1 11.6-2L20 12M4 12l2.8 5a7 7 0 0 0 11.6-2"/></svg>{pedidosLoading?'Atualizando...':'Atualizar pedidos'}</button>
+                </header>
+                {pedidosError && <div className="mb-4 rounded-xl border border-red-900 bg-red-950/50 p-3 text-sm text-red-300">{pedidosError}{!password && <button onClick={handleLogout} className="ml-2 underline font-bold">Sair e entrar novamente</button>}</div>}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+                  <div className="rounded-xl border border-[#2b2b2b] bg-[#161616] p-4"><p className="text-xs text-zinc-400">Total de pedidos</p><p className="text-2xl font-black text-white mt-1">{pedidosOnline.length}</p></div>
+                  <div className="rounded-xl border border-amber-900/60 bg-[#161616] p-4"><p className="text-xs text-zinc-400">Pendentes</p><p className="text-2xl font-black text-amber-300 mt-1">{pedidosOnline.filter(p=>p.status==='pending').length}</p></div>
+                  <div className="rounded-xl border border-purple-900/60 bg-[#161616] p-4"><p className="text-xs text-zinc-400">Em preparo</p><p className="text-2xl font-black text-purple-300 mt-1">{pedidosOnline.filter(p=>p.status==='preparing').length}</p></div>
+                  <div className="rounded-xl border border-emerald-900/60 bg-[#161616] p-4"><p className="text-xs text-zinc-400">Concluídos</p><p className="text-2xl font-black text-emerald-300 mt-1">{pedidosOnline.filter(p=>p.status==='completed').length}</p></div>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-3 mb-2">
+                  {[['todos','Todos'],['pending','Pendentes'],['accepted','Aceitos'],['preparing','Em preparo'],['ready','Prontos'],['completed','Concluídos'],['rejected','Recusados'],['cancelled','Cancelados']].map(([value,label])=><button key={value} onClick={()=>setFiltroPedidos(value)} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-bold border ${filtroPedidos===value?'bg-[#D95B1E] border-[#D95B1E] text-white':'bg-[#191919] border-[#333] text-zinc-400 hover:text-white'}`}>{label}</button>)}
+                </div>
+                {pedidosLoading && pedidosOnline.length===0 ? <div className="rounded-xl border border-[#262626] bg-[#161616] p-10 text-center text-zinc-400">Carregando pedidos...</div> : (pedidosOnline.filter(p=>filtroPedidos==='todos'||p.status===filtroPedidos).length===0 ? <div className="rounded-xl border border-dashed border-[#333] bg-[#161616] p-10 text-center"><div className="text-zinc-500 mb-2"><svg className="mx-auto" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 2h12v20l-2-1-2 1-2-1-2 1-2-1-2 1V2Z"/><path d="M9 8h6M9 12h6"/></svg></div><h2 className="font-bold text-white">Nenhum pedido nesta categoria</h2><p className="text-sm text-zinc-500 mt-1">Quando um cliente enviar um pedido pelo cardápio público, ele aparecerá aqui.</p></div> : <div className="space-y-3">{pedidosOnline.filter(p=>filtroPedidos==='todos'||p.status===filtroPedidos).map(p=>{
+                  const expanded=pedidoExpandido===p.id;
+                  const created=p.created_at?new Date(p.created_at).toLocaleString('pt-BR'):'Data indisponível';
+                  return <article key={p.id} className="rounded-xl border border-[#2b2b2b] bg-[#161616] overflow-hidden">
+                    <div className="p-4 sm:p-5"><div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-white">Pedido #{String(p.id).slice(0,8).toUpperCase()}</h2><span className={`rounded-full border px-2 py-1 text-[10px] font-bold ${statusPedidoClass(p.status)}`}>{statusPedidoLabel(p.status)}</span></div><p className="text-xs text-zinc-500 mt-1">{created}</p><p className="text-sm text-zinc-200 mt-3 font-semibold">{p.customer_name}</p><p className="text-xs text-zinc-400 mt-1">{p.customer_phone}</p></div><div className="sm:text-right"><p className="text-xl font-black text-[#F28B50]">R$ {Number(p.total||0).toFixed(2).replace('.',',')}</p><p className="text-xs text-zinc-400 mt-1">{p.order_type==='delivery'?'Entrega':'Retirada'} · {p.payment_method||'Pagamento não informado'}</p></div></div>
+                    {p.order_type==='delivery'&&p.delivery_address&&<p className="text-xs text-zinc-400 mt-3">Endereço: {p.delivery_address}</p>}{p.notes&&<p className="text-xs text-zinc-400 mt-2">Observações: {p.notes}</p>}
+                    <div className="flex flex-wrap items-center gap-2 mt-4"><button onClick={()=>setPedidoExpandido(expanded?null:p.id)} className="rounded-lg border border-[#3a3a3a] bg-[#242424] px-3 py-2 text-xs font-bold text-white">{expanded?'Ocultar itens':'Ver itens'} ({(p.items||[]).length})</button>{p.status==='pending'&&<><button disabled={pedidoAtualizando===p.id} onClick={()=>atualizarStatusPedido(p.id,'accepted')} className="rounded-lg bg-emerald-700 hover:bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Aceitar pedido</button><button disabled={pedidoAtualizando===p.id} onClick={()=>atualizarStatusPedido(p.id,'rejected')} className="rounded-lg bg-red-950 hover:bg-red-900 border border-red-900 px-3 py-2 text-xs font-bold text-red-300 disabled:opacity-50">Recusar</button></>}{p.status==='accepted'&&<button disabled={pedidoAtualizando===p.id} onClick={()=>atualizarStatusPedido(p.id,'preparing')} className="rounded-lg bg-purple-800 hover:bg-purple-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Iniciar preparo</button>}{p.status==='preparing'&&<button disabled={pedidoAtualizando===p.id} onClick={()=>atualizarStatusPedido(p.id,'ready')} className="rounded-lg bg-blue-800 hover:bg-blue-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Marcar como pronto</button>}{p.status==='ready'&&<button disabled={pedidoAtualizando===p.id} onClick={()=>atualizarStatusPedido(p.id,'completed')} className="rounded-lg bg-emerald-700 hover:bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Concluir pedido</button>}</div>
+                    {expanded&&<div className="mt-4 rounded-lg border border-[#2b2b2b] bg-[#1c1c1c] p-3">{!(p.items||[]).length?<p className="text-xs text-zinc-500">Itens não retornados pelo banco.</p>:<div className="space-y-2">{p.items.map((it,i)=><div key={it.id||i} className="flex justify-between gap-3 text-sm"><span className="text-zinc-300">{it.quantity} × {it.product_name}</span><span className="text-white font-semibold">R$ {Number(it.line_total||0).toFixed(2).replace('.',',')}</span></div>)}<div className="border-t border-[#333] pt-2 flex justify-between font-black"><span>Total</span><span className="text-[#F28B50]">R$ {Number(p.total||0).toFixed(2).replace('.',',')}</span></div></div>}</div>}
+                    </div></article>;
+                })}</div>)}
+              </div>
+            )}
+
+            {abaAtiva === 'cardapio' && (!isSuperAdmin || impersonatedCompany) && (
+              <div className="max-w-6xl space-y-6">
+                <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div><h1 className="text-xl sm:text-2xl font-bold text-white">Cardápio Online</h1><p className="text-xs text-zinc-400 mt-1">Gerencie o que seus clientes veem no cardápio público.</p></div>
+                  <a href={`cardapio.html?slug=${encodeURIComponent(menuSettings.menu_slug || (effectiveCompanyId === 'cozinha-brasileira' ? 'foodstrick' : effectiveCompanyId || ''))}`} target="_blank" rel="noreferrer" className="inline-flex justify-center items-center rounded-lg bg-[#D95B1E] hover:bg-[#c34e17] px-4 py-2.5 text-xs font-bold text-white">Visualizar cardápio ↗</a>
+                </header>
+                <form onSubmit={salvarConfiguracaoCardapio} className="bg-[#161616] border border-[#262626] rounded-xl p-4 sm:p-6 space-y-4">
+                  <h2 className="font-bold text-white">Aparência e funcionamento</h2>
+                  {menuSettingsError && <p className="text-sm text-red-400">{menuSettingsError}</p>}
+                  <label className="flex items-center gap-3 text-sm text-zinc-200"><input type="checkbox" checked={!!menuSettings.menu_enabled} onChange={e=>setMenuSettings(v=>({...v,menu_enabled:e.target.checked}))} className="accent-orange-600"/> Cardápio publicado</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div><label className="block text-xs text-zinc-400 mb-1">Nome público</label><input value={effectiveCompanyName || ''} readOnly className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 text-sm text-zinc-400"/></div>
+                    <div><label className="block text-xs text-zinc-400 mb-1">Final do link público</label><input required value={menuSettings.menu_slug} onChange={e=>setMenuSettings(v=>({...v,menu_slug:e.target.value}))} placeholder="ex.: minha-lanchonete" className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 text-sm text-white"/><p className="text-[10px] text-zinc-500 mt-1">Link: sistema-cozinha-beta.vercel.app/cardapio.html?slug={menuSettings.menu_slug || 'seu-restaurante'}</p></div>
+                    <div><label className="block text-xs text-zinc-400 mb-1">Descrição do restaurante</label><textarea value={menuSettings.menu_description} onChange={e=>setMenuSettings(v=>({...v,menu_description:e.target.value}))} maxLength={500} rows={3} placeholder="Conte um pouco sobre o restaurante" className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 text-sm text-white"/></div>
+                    <div><label className="block text-xs text-zinc-400 mb-1">Cor principal</label><div className="flex gap-3 items-center"><input type="color" value={menuSettings.menu_accent_color} onChange={e=>setMenuSettings(v=>({...v,menu_accent_color:e.target.value}))} className="h-11 w-16 bg-transparent border border-[#333] rounded-lg"/><span className="text-xs text-zinc-400">{menuSettings.menu_accent_color}</span></div></div>
+                  </div>
+                  <div className="rounded-xl border border-[#333] bg-[#1c1c1c] p-4 space-y-3">
+                    <div><h3 className="font-bold text-sm text-white">Imagem de capa do cardápio</h3><p className="text-xs text-zinc-400 mt-1">Personalize o banner superior do cardápio público. Prefira uma imagem horizontal, com espaço livre para o título.</p></div>
+                    <input type="file" accept="image/*" onChange={handleMenuCoverUpload} className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 text-xs text-zinc-300 file:mr-3 file:rounded-md file:border-0 file:bg-[#D95B1E] file:px-3 file:py-2 file:font-bold file:text-white"/>
+                    {menuSettings.menu_cover_image && <><div className="relative overflow-hidden rounded-xl h-40 bg-[#111] border border-[#333]"><img src={menuSettings.menu_cover_image} alt="Prévia da capa do cardápio" className="w-full h-full object-cover"/><div className="absolute inset-0 bg-gradient-to-r from-black/80 to-black/20"/><span className="absolute bottom-4 left-4 text-white font-bold">Prévia da capa</span></div><button type="button" onClick={()=>setMenuSettings(v=>({...v,menu_cover_image:''}))} className="text-xs border border-[#444] rounded-lg px-3 py-2 text-zinc-200 hover:bg-[#292929]">Remover imagem de capa</button></>}
+                    <p className="text-xs text-zinc-500">Depois de escolher, clique em Salvar configurações para publicar a imagem.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-5 text-sm text-zinc-300"><label className="flex items-center gap-2"><input type="checkbox" checked={!!menuSettings.menu_allow_delivery} onChange={e=>setMenuSettings(v=>({...v,menu_allow_delivery:e.target.checked}))} className="accent-orange-600"/> Entrega</label><label className="flex items-center gap-2"><input type="checkbox" checked={!!menuSettings.menu_allow_pickup} onChange={e=>setMenuSettings(v=>({...v,menu_allow_pickup:e.target.checked}))} className="accent-orange-600"/> Retirada</label></div>
+                  <div><label className="block text-xs text-zinc-400 mb-2">Formas de pagamento</label><div className="flex flex-wrap gap-4 text-sm text-zinc-300">{['Pix','Dinheiro','Cartão'].map(m=><label key={m} className="flex items-center gap-2"><input type="checkbox" checked={menuSettings.menu_payment_methods.includes(m)} onChange={e=>setMenuSettings(v=>({...v,menu_payment_methods:e.target.checked?[...v.menu_payment_methods,m]:v.menu_payment_methods.filter(x=>x!==m)}))} className="accent-orange-600"/>{m}</label>)}</div></div>
+                  <button disabled={menuSaving} className="rounded-lg bg-[#D95B1E] hover:bg-[#c34e17] disabled:opacity-50 px-5 py-3 text-sm font-bold text-white">{menuSaving?'Salvando...':'Salvar configurações'}</button>
+                </form>
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                  <form onSubmit={salvarProdutoCardapio} className="lg:col-span-2 bg-[#161616] border border-[#262626] rounded-xl p-4 sm:p-6 space-y-3 h-fit">
+                    <div className="flex items-center justify-between gap-2"><h2 className="font-bold text-white">{menuProductForm.id?'Editar item':'Adicionar item'}</h2>{menuProductForm.id&&<button type="button" onClick={()=>setMenuProductForm({id:null,nome:'',preco_venda:'',custo_unitario:'0',menu_description:'',menu_ingredients:'',menu_category:'Pratos',menu_image_url:'',menu_available:true})} className="text-xs text-zinc-400 hover:text-white">Cancelar edição</button>}</div>
+                    <div><label className="block text-xs text-zinc-400 mb-1">Nome do produto</label><input required value={menuProductForm.nome} onChange={e=>setMenuProductForm(v=>({...v,nome:e.target.value}))} maxLength={120} className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 text-sm text-white"/></div>
+                    <div><label className="block text-xs text-zinc-400 mb-1">Preço (R$)</label><input required type="number" min="0" step="0.01" value={menuProductForm.preco_venda} onChange={e=>setMenuProductForm(v=>({...v,preco_venda:e.target.value}))} className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 text-sm text-white"/></div>
+                    <div><label className="block text-xs text-zinc-400 mb-1">Custo unitário (R$) — para manter os cálculos financeiros</label><input type="number" min="0" step="0.01" value={menuProductForm.custo_unitario} onChange={e=>setMenuProductForm(v=>({...v,custo_unitario:e.target.value}))} className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 text-sm text-white"/></div>
+                    <div><label className="block text-xs text-zinc-400 mb-1">Categoria</label><input value={menuProductForm.menu_category} onChange={e=>setMenuProductForm(v=>({...v,menu_category:e.target.value}))} placeholder="Hambúrgueres, Bebidas..." maxLength={60} className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 text-sm text-white"/></div>
+                    <div><label className="block text-xs text-zinc-400 mb-1">Descrição do prato</label><textarea value={menuProductForm.menu_description} onChange={e=>setMenuProductForm(v=>({...v,menu_description:e.target.value}))} maxLength={800} rows={3} placeholder="Descrição que aparecerá para o cliente" className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 text-sm text-white"/></div>
+                    <div><label className="block text-xs text-zinc-400 mb-1">Ingredientes</label><textarea value={menuProductForm.menu_ingredients} onChange={e=>setMenuProductForm(v=>({...v,menu_ingredients:e.target.value}))} maxLength={800} rows={2} placeholder="Pão, carne, queijo, alface..." className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 text-sm text-white"/></div>
+                    <div><label className="block text-xs text-zinc-400 mb-1">Foto do produto</label><input type="file" accept="image/*" onChange={handleMenuImageUpload} className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 text-xs text-zinc-300 file:mr-3 file:rounded-md file:border-0 file:bg-[#D95B1E] file:px-3 file:py-2 file:font-bold file:text-white"/><label className="block text-[10px] text-zinc-500 mt-2 mb-1">Ou cole a URL direta da imagem</label><input type="url" value={menuProductForm.menu_image_url.startsWith("data:") ? "" : menuProductForm.menu_image_url} onChange={e=>setMenuProductForm(v=>({...v,menu_image_url:e.target.value}))} placeholder="https://..." className="w-full bg-[#202020] border border-[#333] rounded-lg p-3 text-sm text-white"/><p className="text-[10px] text-zinc-500 mt-1">A imagem selecionada é reduzida antes de ser salva para diminuir o tamanho do arquivo.</p></div>
+                    {menuProductForm.menu_image_url&&<img src={menuProductForm.menu_image_url} alt="Prévia do produto" className="w-full h-36 object-cover rounded-lg border border-[#333]" onError={e=>{e.currentTarget.style.display='none'}}/>}
+                    <label className="flex items-center gap-2 text-sm text-zinc-300"><input type="checkbox" checked={!!menuProductForm.menu_available} onChange={e=>setMenuProductForm(v=>({...v,menu_available:e.target.checked}))} className="accent-orange-600"/> Disponível no cardápio</label>
+                    <button disabled={menuSaving} className="w-full rounded-lg bg-[#D95B1E] hover:bg-[#c34e17] disabled:opacity-50 px-4 py-3 text-sm font-bold text-white">{menuSaving?'Salvando...':menuProductForm.id?'Salvar alterações':'Cadastrar produto'}</button>
+                  </form>
+                  <section className="lg:col-span-3 bg-[#161616] border border-[#262626] rounded-xl p-4 sm:p-6">
+                    <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-white">Produtos do cardápio</h2><span className="text-xs text-zinc-500">{produtos.length} itens</span></div>
+                    {!produtos.length?<p className="text-sm text-zinc-500 py-8 text-center">Nenhum produto cadastrado para esta empresa ainda.</p>:<div className="space-y-3">{produtos.map(p=><article key={p.id} className="flex gap-3 border border-[#2b2b2b] bg-[#1b1b1b] rounded-xl p-3">{p.menu_image_url?<img src={p.menu_image_url} alt="" className="w-20 h-20 rounded-lg object-cover shrink-0"/>:<div className="w-20 h-20 rounded-lg bg-[#252525] flex items-center justify-center text-zinc-600 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></div>}<div className="flex-1 min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-sm text-white">{p.nome}</h3><span className={`text-[10px] px-2 py-0.5 rounded-full ${p.menu_available===false?'bg-zinc-700 text-zinc-300':'bg-emerald-950 text-emerald-300'}`}>{p.menu_available===false?'Indisponível':'Disponível'}</span></div><p className="text-xs text-zinc-400 mt-1 line-clamp-2">{p.menu_description||p.observacao||'Sem descrição'}</p><p className="text-sm font-bold text-[#F28B50] mt-2">R$ {Number(p.preco_venda||0).toFixed(2).replace('.',',')}</p><div className="flex flex-wrap gap-2 mt-2"><button type="button" onClick={()=>editarProdutoCardapio(p)} className="text-xs bg-[#292929] hover:bg-[#353535] rounded-lg px-3 py-1.5 text-white">Editar</button><button type="button" onClick={()=>alternarDisponibilidadeCardapio(p)} className="text-xs bg-[#292929] hover:bg-[#353535] rounded-lg px-3 py-1.5 text-zinc-300">{p.menu_available===false?'Disponibilizar':'Indisponibilizar'}</button></div></div></article>)}</div>}
+                  </section>
+                </div>
+              </div>
+            )}
+
+            {/* 4. ABA FICHAS TÉCNICAS */}
+            {abaAtiva === 'fichas' && (!isSuperAdmin || impersonatedCompany) && (
+              <div className="max-w-6xl">
+                <header className="mb-5">
+                  <h1 className="text-xl sm:text-2xl font-bold text-white">Central de Fichas Técnicas</h1>
+                  <p className="text-[11px] sm:text-xs text-zinc-400">Controlo de insumos e pesagem</p>
+                </header>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {produtos.map(p => {
+                    const ingList = Array.isArray(p.ingredientes) ? p.ingredientes : [];
+                    const somaCusto = ingList.reduce((acc, curr) => acc + Number(curr.custo || 0), 0);
+                    const custoFinal = ingList.length > 0 ? somaCusto : Number(p.custo_unitario || 0);
+                    const preco = Number(p.preco_venda || 0);
+                    const margem = preco - custoFinal;
+
+                    return (
+                      <div key={p.id} className="bg-[#161616] border border-[#262626] rounded-xl p-4 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-start justify-between mb-2.5">
+                            <div>
+                              <h3 className="text-sm sm:text-base font-bold text-white">{p.nome}</h3>
+                              <span className="text-[10px] text-zinc-500">{ingList.length} insumos</span>
+                            </div>
+                            <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-900/60">
+                              R$ {custoFinal.toFixed(2)}
+                            </span>
+                          </div>
+
+                          <div className="bg-[#1f1f1f] rounded-lg p-2.5 my-2 space-y-1 text-xs text-zinc-300">
+                            {ingList.length === 0 ? (
+                              <p className="text-zinc-500 italic text-[11px]">Nenhum ingrediente adicionado.</p>
+                            ) : (
+                              ingList.slice(0, 3).map((item, idx) => (
+                                <div key={idx} className="flex justify-between text-[11px]">
+                                  <span className="text-zinc-400 truncate max-w-[130px]">{item.nome} ({item.quantidade})</span>
+                                  <span className="text-white font-mono">R$ {Number(item.custo).toFixed(2)}</span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="pt-2.5 border-t border-[#262626] flex items-center justify-between">
+                          <span className="text-emerald-400 text-xs font-semibold">Margem: R$ {margem.toFixed(2)}</span>
+                          <button onClick={() => setModalFichaTecnica({ aberto: true, produto: p })} className="bg-emerald-950/60 hover:bg-emerald-900 text-emerald-400 border border-emerald-800/60 font-bold px-3 py-1.5 rounded-lg text-xs cursor-pointer">
+                            Abrir Ficha
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 5. ABA FECHAMENTO MENSAL */}
+            {abaAtiva === 'fechamento' && (!isSuperAdmin || impersonatedCompany) && (
+              <div className="max-w-6xl">
+                <header className="mb-5">
+                  <h1 className="text-xl sm:text-2xl font-bold text-white">Fechamento do Mês</h1>
+                  <p className="text-[11px] sm:text-xs text-zinc-400">Consolidação e reinício de ciclo</p>
+                </header>
+
+                <div className="bg-[#161616] border border-[#D95B1E]/40 rounded-2xl p-4 sm:p-6 mb-6 shadow-xl">
+                  <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-[#262626]">
+                    <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D95B1E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                      Resumo Atual
+                    </h2>
+                    <span className="text-[10px] sm:text-xs font-mono font-bold text-[#D95B1E] bg-[#D95B1E]/10 border border-[#D95B1E]/30 px-2 py-0.5 rounded">
+                      {lancamentosAtivos.length} ativos
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 mb-5">
+                    <div className="bg-[#1f1f1f] p-3 rounded-xl border border-[#2d2d2d]"><span className="text-[9px] text-zinc-500 uppercase block">Faturamento</span><span className="text-sm sm:text-lg font-bold text-white">R$ {faturamento.toFixed(2)}</span></div>
+                    <div className="bg-[#1f1f1f] p-3 rounded-xl border border-[#2d2d2d]"><span className="text-[9px] text-zinc-500 uppercase block">Despesas</span><span className="text-sm sm:text-lg font-bold text-red-400">R$ {totalDespesas.toFixed(2)}</span></div>
+                    <div className="bg-[#1f1f1f] p-3 rounded-xl border border-[#2d2d2d]"><span className="text-[9px] text-zinc-500 uppercase block">Lucro</span><span className="text-sm sm:text-lg font-bold text-emerald-400">R$ {resultadoMes.toFixed(2)}</span></div>
+                    <div className="bg-[#1f1f1f] p-3 rounded-xl border border-[#2d2d2d]"><span className="text-[9px] text-zinc-500 uppercase block">Volume</span><span className="text-xs sm:text-sm font-bold text-zinc-200 mt-0.5 block">{totalPratos}P / {totalBebidas}B</span></div>
+                  </div>
+
+                  <button onClick={handleExecutarFechamento} disabled={processandoFechamento || lancamentosAtivos.length === 0} className="w-full bg-[#D95B1E] hover:bg-[#c34e17] disabled:opacity-50 text-white font-bold py-3.5 sm:py-3 rounded-xl text-xs transition-all shadow-lg active:scale-95 cursor-pointer">
+                    {processandoFechamento ? 'A processar...' : 'Encerrar Mês & Arquivar Lançamentos'}
+                  </button>
+                </div>
+
+                <div>
+                  <h2 className="text-sm sm:text-base font-bold text-white mb-3">Extratos Anteriores</h2>
+                  {historicoFechamentos.length === 0 ? (
+                    <div className="bg-[#161616] border border-[#262626] rounded-xl p-5 text-center text-zinc-500 text-xs italic">Nenhum fechamento realizado até ao momento.</div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {historicoFechamentos.map(fech => (
+                        <div key={fech.id} className="bg-[#161616] border border-[#262626] rounded-xl p-4">
+                          <div className="flex justify-between items-center pb-2 border-b border-[#262626] mb-2">
+                            <h3 className="font-bold text-white text-xs">Mês: {fech.mes_ano}</h3>
+                            <span className="text-[10px] text-zinc-500">{new Date(fech.data_fechamento).toLocaleDateString()}</span>
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex justify-between"><span className="text-zinc-400">Faturação:</span><span className="text-white font-mono">R$ {Number(fech.relatorio.faturamento).toFixed(2)}</span></div>
+                            <div className="flex justify-between"><span className="text-zinc-400">Despesas:</span><span className="text-red-400 font-mono">R$ {Number(fech.relatorio.despesas).toFixed(2)}</span></div>
+                            <div className="flex justify-between border-t border-[#262626] pt-1 font-bold"><span className="text-zinc-300">Lucro:</span><span className="text-emerald-400 font-mono">R$ {Number(fech.relatorio.lucro).toFixed(2)}</span></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 6. CONFIGURAÇÕES & ADMINISTRAÇÃO B2B */}
+            {abaAtiva === 'configuracoes' && (
+              <div className="max-w-6xl">
+                <div className="md:hidden flex items-center gap-1.5 overflow-x-auto pb-3 mb-4 border-b border-[#242424]">
+                  {(!isSuperAdmin || impersonatedCompany) && (
+                    <button onClick={() => setSubAbaConfig('exclusoes')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap ${subAbaConfig === 'exclusoes' ? 'bg-[#D95B1E] text-white' : 'bg-[#1c1c1c] text-zinc-400'}`}>
+                      Lixeira
+                    </button>
+                  )}
+                  <button onClick={() => setSubAbaConfig('conta')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap ${subAbaConfig === 'conta' ? 'bg-[#D95B1E] text-white' : 'bg-[#1c1c1c] text-zinc-400'}`}>
+                    Minha Conta
+                  </button>
+                  {isSuperAdmin && (
+                    <button onClick={() => { setSubAbaConfig('empresas'); fetchCompanies(); }} className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap ${subAbaConfig === 'empresas' ? 'bg-blue-600 text-white' : 'bg-[#1c1c1c] text-blue-400'}`}>
+                      Gestão Cozinhas (B2B)
+                    </button>
+                  )}
+                </div>
+
+                {subAbaConfig === 'exclusoes' && (!isSuperAdmin || impersonatedCompany) && (
+                  <div>
+                    <h1 className="text-xl sm:text-2xl font-bold text-white mb-1">Lixeira de Exclusões</h1>
+                    <div className="bg-[#161616] border border-[#262626] rounded-xl p-4 overflow-x-auto mt-4">
+                      {lancamentosExcluidos.length === 0 ? <p className="text-zinc-500 text-xs italic">Nenhum registo cancelado.</p> : (
+                        <table className="w-full text-left text-xs text-zinc-400 min-w-[500px]">
+                          <thead className="border-b border-[#262626]">
+                            <tr><th className="pb-2.5 uppercase">Data</th><th className="pb-2.5 uppercase">Descrição</th><th className="pb-2.5 uppercase text-right">Valor</th><th className="pb-2.5 uppercase text-red-400 pl-4">Motivo</th></tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#262626]">
+                            {lancamentosExcluidos.map(l => (
+                              <tr key={l.id} className="hover:bg-[#1c1c1c]">
+                                <td className="py-2.5">{l.data}</td>
+                                <td className="py-2.5 text-zinc-400 line-through">{l.descricao}</td>
+                                <td className="py-2.5 text-right text-zinc-400 line-through">R$ {Number(l.valor_total).toFixed(2)}</td>
+                                <td className="py-2.5 text-red-400 font-bold pl-4">{l.motivo_exclusao}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {subAbaConfig === 'empresas' && isSuperAdmin && (
+                  <div>
+                    <h1 className="text-xl sm:text-2xl font-bold text-white mb-4">Gestão de Clientes (B2B)</h1>
+                    <form onSubmit={handleCreateCompanyB2B} className="bg-[#161616] border border-[#262626] p-4 sm:p-6 rounded-xl mb-6 space-y-3">
+                      <h2 className="text-xs font-bold text-blue-400 uppercase tracking-wider">Registar Nova Cozinha</h2>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <input type="text" placeholder="Nome do Cliente" value={newCompanyName} onChange={e => setNewCompanyName(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
+                        <input type="text" placeholder="ID Interno" value={newCompanySlug} onChange={e => setNewCompanySlug(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" />
+                        <input type="text" placeholder="WhatsApp / Telefone" value={newCompanyPhone} onChange={e => setNewCompanyPhone(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <input type="text" placeholder="Login" value={newCompanyAdminUser} onChange={e => setNewCompanyAdminUser(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
+                        <input type="password" placeholder="Palavra-passe" value={newCompanyAdminPass} onChange={e => setNewCompanyAdminPass(e.target.value)} className="bg-[#202020] border border-[#333] rounded-lg p-2.5 text-base md:text-xs text-white outline-none" required />
+                      </div>
+                      <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-lg text-xs">Ativar Cozinha</button>
+                    </form>
+
+                    <div className="bg-[#161616] border border-[#262626] rounded-xl p-4">
+                      <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Cozinhas Registadas ({companiesList.length})</h2>
+                      <div className="space-y-2">
+                        {companiesList.map(comp => (
+                          <div key={comp.id} className="bg-[#202020] p-3 rounded-lg border border-[#2d2d2d] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                            <div>
+                              <p className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">{comp.company_name} <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${comp.status === 'ativo' ? 'bg-emerald-950 text-emerald-400' : 'bg-red-950 text-red-400'}`}>{comp.status}</span></p>
+                              <p className="text-[10px] text-zinc-500 font-mono">ID: {comp.company_id}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => handleStartImpersonation(comp)} className="flex-1 sm:flex-initial bg-amber-500/10 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs font-bold">Aceder Painel ↗</button>
+                              <button onClick={() => handleToggleCompanyStatus(comp.id, comp.status)} className="bg-zinc-800 text-zinc-300 px-3 py-1.5 rounded-lg text-xs font-medium">{comp.status === 'ativo' ? 'Suspender' : 'Reativar'}</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {subAbaConfig === 'conta' && (
+                  <div className="bg-[#161616] border border-[#262626] p-5 sm:p-8 rounded-2xl w-full">
+                    <div className="flex flex-col lg:flex-row gap-6 sm:gap-10">
+                      <div className="flex flex-col items-center shrink-0">
+                        <div className="relative group mb-3">
+                          <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden bg-[#111111] border-2 border-[#D95B1E] shadow-xl flex items-center justify-center">
+                            {currentUser?.avatar_url ? (
+                              <img src={currentUser.avatar_url} alt="Perfil" className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-4xl sm:text-5xl font-black text-[#D95B1E] uppercase">
+                                {currentUser?.username ? currentUser.username.charAt(0) : '?'}
+                              </span>
+                            )}
+                          </div>
+                          <button onClick={() => avatarInputRef.current?.click()} className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[11px] font-semibold cursor-pointer">
+                            Mudar Foto
+                          </button>
+                          <input type="file" accept="image/*" ref={avatarInputRef} onChange={handleAvatarUpload} className="hidden" />
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => avatarInputRef.current?.click()} className="text-xs text-[#D95B1E] hover:text-[#c34e17] font-semibold">Alterar foto</button>
+                          {currentUser?.avatar_url && <button onClick={handleRemoveAvatar} className="text-xs text-zinc-500 hover:text-red-400">Remover</button>}
+                        </div>
+                      </div>
+
+                      <div className="flex-1 w-full border-t lg:border-t-0 lg:border-l border-[#262626] pt-5 lg:pt-0 lg:pl-10">
+                        <h1 className="text-lg sm:text-2xl font-bold text-white mb-1 sm:mb-2">Informações da Sessão</h1>
+                        <p className="text-[11px] sm:text-xs text-zinc-400 mb-5">Gestão das credenciais ativas do sistema.</p>
+                        <div className="space-y-3 sm:space-y-5">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="bg-[#1f1f1f] border border-[#2d2d2d] rounded-xl p-3.5">
+                              <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-0.5">Utilizador</span>
+                              <span className="font-bold text-white text-sm sm:text-base">{currentUser?.username}</span>
+                            </div>
+                            <div className="bg-[#1f1f1f] border border-[#2d2d2d] rounded-xl p-3.5">
+                              <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-0.5">Função</span>
+                              <span className="font-bold text-[#D95B1E] uppercase text-sm sm:text-base">{currentUser?.role}</span>
+                            </div>
+                          </div>
+                          <div className="bg-[#1f1f1f] border border-[#2d2d2d] rounded-xl p-3.5">
+                            <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-0.5">Unidade Ativa</span>
+                            <span className="font-bold text-white text-sm sm:text-lg block truncate">{effectiveCompanyName}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </main>
+
+          {/* CURSOR MULTIPLAYER */}
+          {isSupportSessionActive && (
+            <LiveCursor 
+              companyId={effectiveCompanyId}
+              currentUsername={currentUser?.username}
+              currentUserRole={currentUser?.role}
+              targetUsername={isSuperAdmin ? 'cozinha' : 'admin'}
+              isActive={isSupportSessionActive}
+              supabaseClient={supabaseClient}
+            />
+          )}
+
+          {/* CHAT DE SUPORTE */}
+          {isSupportSessionActive && (
+            <SupportChat 
+              companyId={effectiveCompanyId}
+              currentUsername={currentUser?.username}
+              currentUserRole={currentUser?.role}
+              operatorUsername={isSuperAdmin ? 'cozinha' : currentUser?.username}
+              isVisible={isSupportSessionActive}
+              supabaseClient={supabaseClient}
+            />
+          )}
+
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
   </script>
 </body>
 </html>
