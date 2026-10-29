@@ -465,7 +465,7 @@
       const [novoProduto, setNovoProduto] = useState({ nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
 
       // Cardápio Online: dados separados por estabelecimento
-      const [menuSettings, setMenuSettings] = useState({ menu_enabled: true, menu_slug: '', menu_description: '', menu_accent_color: '#D95B1E', menu_cover_image: '', menu_allow_delivery: true, menu_allow_pickup: true, menu_payment_methods: ['Pix', 'Dinheiro', 'Cartão'] });
+      const [menuSettings, setMenuSettings] = useState({ menu_enabled: true, menu_slug: '', menu_description: '', menu_accent_color: '#D95B1E', menu_cover_image: '', menu_allow_delivery: true, menu_allow_pickup: true, menu_payment_methods: ['Pix', 'Dinheiro', 'Cartão'], pix_manual_enabled: false, pix_key: '', pix_receiver_name: '', pix_receiver_city: '', pix_auto_enabled: false, pix_provider: 'infinitepay' });
       const [menuProductForm, setMenuProductForm] = useState({ id: null, nome: '', preco_venda: '', custo_unitario: '0', menu_description: '', menu_ingredients: '', menu_category: 'Pratos', menu_image_url: '', menu_available: true });
       const [coverEditorSource, setCoverEditorSource] = useState(null);
       const [menuSaving, setMenuSaving] = useState(false);
@@ -696,7 +696,8 @@
             menu_cover_image: data?.menu_cover_image || '',
             menu_allow_delivery: data?.menu_allow_delivery ?? true,
             menu_allow_pickup: data?.menu_allow_pickup ?? true,
-            menu_payment_methods: Array.isArray(data?.menu_payment_methods) ? data.menu_payment_methods : ['Pix', 'Dinheiro', 'Cartão']
+            menu_payment_methods: Array.isArray(data?.menu_payment_methods) ? data.menu_payment_methods : ['Pix', 'Dinheiro', 'Cartão'],
+            pix_manual_enabled: data?.pix_manual_enabled ?? false, pix_key: data?.pix_key || '', pix_receiver_name: data?.pix_receiver_name || '', pix_receiver_city: data?.pix_receiver_city || '', pix_auto_enabled: data?.pix_auto_enabled ?? false, pix_provider: data?.pix_provider || 'infinitepay'
           });
           setMenuLoaded(true);
         } catch (err) {
@@ -710,6 +711,7 @@
         const slug = String(menuSettings.menu_slug || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
         if (!slug) return alert('Informe um endereço público válido.');
         if (!menuSettings.menu_allow_delivery && !menuSettings.menu_allow_pickup) return alert('Ative entrega, retirada ou ambas.');
+        if (menuSettings.pix_manual_enabled && (!menuSettings.pix_key.trim() || !menuSettings.pix_receiver_name.trim() || !menuSettings.pix_receiver_city.trim())) return alert('Preencha chave Pix, nome e cidade do recebedor.');
         setMenuSaving(true);
         const payload = {
           menu_enabled: Boolean(menuSettings.menu_enabled), menu_slug: slug,
@@ -718,6 +720,7 @@
           menu_cover_image: String(menuSettings.menu_cover_image || ''),
           menu_allow_delivery: Boolean(menuSettings.menu_allow_delivery), menu_allow_pickup: Boolean(menuSettings.menu_allow_pickup),
           menu_payment_methods: (menuSettings.menu_payment_methods || []).filter(Boolean),
+          pix_manual_enabled: !!menuSettings.pix_manual_enabled, pix_key: String(menuSettings.pix_key||'').trim(), pix_receiver_name: String(menuSettings.pix_receiver_name||'').trim(), pix_receiver_city: String(menuSettings.pix_receiver_city||'').trim(), pix_auto_enabled: !!menuSettings.pix_auto_enabled, pix_provider: menuSettings.pix_provider || 'infinitepay',
           updated_at: new Date().toISOString()
         };
         const { error } = await supabaseClient.from('companies').update(payload).eq('company_id', effectiveCompanyId);
@@ -1860,6 +1863,18 @@
                   </div>
                   <div className="flex flex-wrap gap-5 text-sm text-zinc-300"><label className="flex items-center gap-2"><input type="checkbox" checked={!!menuSettings.menu_allow_delivery} onChange={e=>setMenuSettings(v=>({...v,menu_allow_delivery:e.target.checked}))} className="accent-orange-600"/> Entrega</label><label className="flex items-center gap-2"><input type="checkbox" checked={!!menuSettings.menu_allow_pickup} onChange={e=>setMenuSettings(v=>({...v,menu_allow_pickup:e.target.checked}))} className="accent-orange-600"/> Retirada</label></div>
                   <div><label className="block text-xs text-zinc-400 mb-2">Formas de pagamento</label><div className="flex flex-wrap gap-4 text-sm text-zinc-300">{['Pix','Dinheiro','Cartão'].map(m=><label key={m} className="flex items-center gap-2"><input type="checkbox" checked={menuSettings.menu_payment_methods.includes(m)} onChange={e=>setMenuSettings(v=>({...v,menu_payment_methods:e.target.checked?[...v.menu_payment_methods,m]:v.menu_payment_methods.filter(x=>x!==m)}))} className="accent-orange-600"/>{m}</label>)}</div></div>
+                  <section className="rounded-xl border border-[#383838] bg-[#1b1b1b] p-4 space-y-3">
+                    <h3 className="font-bold text-white">Pagamentos Pix do restaurante</h3>
+                    <label className="flex gap-2 items-center text-sm"><input type="checkbox" checked={!!menuSettings.pix_manual_enabled} onChange={e=>setMenuSettings(v=>({...v,pix_manual_enabled:e.target.checked}))}/> Ativar Pix por chave (confirmação manual)</label>
+                    {menuSettings.pix_manual_enabled && <div className="grid sm:grid-cols-2 gap-3">
+                      <label className="text-xs text-zinc-300">Chave Pix<input value={menuSettings.pix_key} onChange={e=>setMenuSettings(v=>({...v,pix_key:e.target.value}))} placeholder="Chave Pix do estabelecimento" className="block mt-1 w-full bg-[#252525] border border-[#444] rounded-lg p-3 text-sm"/></label>
+                      <label className="text-xs text-zinc-300">Nome do recebedor (até 25 caracteres)<input maxLength={25} value={menuSettings.pix_receiver_name} onChange={e=>setMenuSettings(v=>({...v,pix_receiver_name:e.target.value}))} className="block mt-1 w-full bg-[#252525] border border-[#444] rounded-lg p-3 text-sm"/></label>
+                      <label className="text-xs text-zinc-300">Cidade do recebedor (até 15 caracteres)<input maxLength={15} value={menuSettings.pix_receiver_city} onChange={e=>setMenuSettings(v=>({...v,pix_receiver_city:e.target.value}))} className="block mt-1 w-full bg-[#252525] border border-[#444] rounded-lg p-3 text-sm"/></label>
+                    </div>}
+                    <label className="flex gap-2 items-center text-sm"><input type="checkbox" checked={!!menuSettings.pix_auto_enabled} onChange={e=>setMenuSettings(v=>({...v,pix_auto_enabled:e.target.checked}))}/> Preparar Pix automático (integração pendente)</label>
+                    {menuSettings.pix_auto_enabled && <><select value={menuSettings.pix_provider} onChange={e=>setMenuSettings(v=>({...v,pix_provider:e.target.value}))} className="bg-[#252525] border border-[#444] rounded-lg p-3 text-sm"><option value="infinitepay">InfinitePay</option><option value="mercadopago">Mercado Pago</option><option value="asaas">Asaas</option></select><p className="text-xs text-amber-300">A ativação aqui apenas registra a preferência. O checkout automático ficará indisponível até configurarmos uma integração segura no servidor.</p></>}
+                    <p className="text-xs text-zinc-400">No Pix por chave, confira o extrato antes de aceitar o pedido como pago. Nunca confirme apenas por comprovante ou clique do cliente.</p>
+                  </section>
                   <button disabled={menuSaving} className="rounded-lg bg-[#D95B1E] hover:bg-[#c34e17] disabled:opacity-50 px-5 py-3 text-sm font-bold text-white">{menuSaving?'Salvando...':'Salvar configurações'}</button>
                 </form>
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
