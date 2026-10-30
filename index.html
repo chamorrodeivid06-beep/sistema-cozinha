@@ -484,6 +484,9 @@
       const [novoProduto, setNovoProduto] = useState({ nome: '', preco_venda: '', custo_unitario: '', observacao: '' });
 
       // Cardápio Online: dados separados por estabelecimento
+      const [ipHandle, setIpHandle] = useState('');
+      const [ipKey, setIpKey] = useState('');
+      const [ipSaving, setIpSaving] = useState(false);
       const [menuSettings, setMenuSettings] = useState({ menu_enabled: true, menu_slug: '', menu_description: '', menu_accent_color: '#D95B1E', menu_cover_image: '', menu_allow_delivery: true, menu_allow_pickup: true, menu_payment_methods: ['Pix', 'Dinheiro', 'Cartão'], pix_manual_enabled: false, pix_key: '', pix_receiver_name: '', pix_receiver_city: '', pix_auto_enabled: false, pix_provider: 'infinitepay' });
       const [menuProductForm, setMenuProductForm] = useState({ id: null, nome: '', preco_venda: '', custo_unitario: '0', menu_description: '', menu_ingredients: '', menu_category: 'Pratos', menu_image_url: '', menu_available: true });
       const [coverEditorSource, setCoverEditorSource] = useState(null);
@@ -679,6 +682,20 @@
         } catch (err) {
           setMenuSettingsError('Não foi possível carregar as configurações. Confira as permissões da tabela companies: ' + (err.message || 'erro desconhecido'));
         }
+      }
+
+      async function salvarCredenciaisInfinitePay(e) {
+        e.preventDefault();
+        if (!effectiveCompanyId || effectiveCompanyId === 'foodstrick-master') return alert('Entre na conta do restaurante.');
+        if (!ipHandle.trim() || !ipKey.trim()) return alert('Informe InfiniteTag e API Key.');
+        setIpSaving(true);
+        try {
+          const { data, error } = await supabaseClient.functions.invoke('foodstrick-infinitepay', { body: { action: 'configure', handle: ipHandle.trim().replace(/^\$/, ''), api_key: ipKey.trim() } });
+          if (error || !data?.configured) throw new Error(data?.error || error?.message || 'Falha na configuração');
+          setIpKey('');
+          alert('InfinitePay configurada para esta empresa. Agora ative Pix automático e salve o cardápio.');
+        } catch (err) { alert('Erro na InfinitePay: ' + (err.message || 'Não foi possível salvar')); }
+        finally { setIpSaving(false); }
       }
 
       async function salvarConfiguracaoCardapio(e) {
@@ -1891,8 +1908,15 @@
                       <label className="text-xs text-zinc-300">Nome do recebedor (até 25 caracteres)<input maxLength={25} value={menuSettings.pix_receiver_name} onChange={e=>setMenuSettings(v=>({...v,pix_receiver_name:e.target.value}))} className="block mt-1 w-full bg-[#252525] border border-[#444] rounded-lg p-3 text-sm"/></label>
                       <label className="text-xs text-zinc-300">Cidade do recebedor (até 15 caracteres)<input maxLength={15} value={menuSettings.pix_receiver_city} onChange={e=>setMenuSettings(v=>({...v,pix_receiver_city:e.target.value}))} className="block mt-1 w-full bg-[#252525] border border-[#444] rounded-lg p-3 text-sm"/></label>
                     </div>}
+                    <div className="rounded-xl border border-[#444] p-3 space-y-2">
+                      <p className="text-xs font-bold text-white">Conectar InfinitePay desta empresa</p>
+                      <p className="text-xs text-zinc-400">A API Key é enviada ao servidor e armazenada cifrada. Nunca coloque a chave no GitHub.</p>
+                      <input value={ipHandle} onChange={e=>setIpHandle(e.target.value)} placeholder="InfiniteTag sem $" autoComplete="off" className="w-full bg-[#252525] border border-[#444] rounded-lg p-3 text-sm"/>
+                      <input type="password" value={ipKey} onChange={e=>setIpKey(e.target.value)} placeholder="API Key inchk_..." autoComplete="new-password" className="w-full bg-[#252525] border border-[#444] rounded-lg p-3 text-sm"/>
+                      <button type="button" disabled={ipSaving} onClick={salvarCredenciaisInfinitePay} className="rounded-lg border border-orange-700 px-4 py-2 text-sm font-bold text-orange-300 disabled:opacity-50">{ipSaving?'Conectando...':'Salvar credenciais InfinitePay'}</button>
+                    </div>
                     <label className="flex gap-2 items-center text-sm"><input type="checkbox" checked={!!menuSettings.pix_auto_enabled} onChange={e=>setMenuSettings(v=>({...v,pix_auto_enabled:e.target.checked}))}/> Ativar Pix automático InfinitePay (após instalar o servidor)</label>
-                    {menuSettings.pix_auto_enabled && <><select value={menuSettings.pix_provider} onChange={e=>setMenuSettings(v=>({...v,pix_provider:e.target.value}))} className="bg-[#252525] border border-[#444] rounded-lg p-3 text-sm"><option value="infinitepay">InfinitePay</option><option value="mercadopago">Mercado Pago</option><option value="asaas">Asaas</option></select><p className="text-xs text-amber-300">Para receber pagamentos, instale a migração SQL e a Edge Function do pacote. A InfiniteTag de testes fica configurada no servidor, não neste HTML.</p></>}
+                    {menuSettings.pix_auto_enabled && <><select value={menuSettings.pix_provider} onChange={e=>setMenuSettings(v=>({...v,pix_provider:e.target.value}))} className="bg-[#252525] border border-[#444] rounded-lg p-3 text-sm"><option value="infinitepay">InfinitePay</option><option value="mercadopago">Mercado Pago</option><option value="asaas">Asaas</option></select><p className="text-xs text-amber-300">Para receber pagamentos, instale a migração SQL e a Edge Function do pacote. Cada restaurante configura sua própria InfiniteTag e API Key acima.</p></>}
                     <p className="text-xs text-zinc-400">No Pix por chave, confira o extrato antes de aceitar o pedido como pago. Nunca confirme apenas por comprovante ou clique do cliente.</p>
                   </section>
                   <button disabled={menuSaving} className="rounded-lg bg-[#D95B1E] hover:bg-[#c34e17] disabled:opacity-50 px-5 py-3 text-sm font-bold text-white">{menuSaving?'Salvando...':'Salvar configurações'}</button>
