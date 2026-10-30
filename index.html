@@ -405,14 +405,36 @@
     }
 
     function App() {
-      const [currentUser, setCurrentUser] = useState(() => {
-        try {
-          const s = localStorage.getItem('foodstrick_master_session');
-          return s ? JSON.parse(s) : null;
-        } catch(e) { return null; }
-      });
+      const [currentUser, setCurrentUser] = useState(null);
+      const [isAuthenticated, setIsAuthenticated] = useState(false);
+      const [authLoading, setAuthLoading] = useState(true);
 
-      const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(currentUser));
+      useEffect(() => {
+        let alive = true;
+        async function loadSession() {
+          try {
+            const { data: { user }, error } = await supabaseClient.auth.getUser();
+            if (error) throw error;
+            if (!user) { if (alive) { setCurrentUser(null); setIsAuthenticated(false); } return; }
+            const { data: profile, error: profileError } = await supabaseClient
+              .from('foodstrick_auth_profiles').select('username,role,company_id,avatar_url')
+              .eq('user_id', user.id).single();
+            if (profileError || !profile) throw new Error('Conta sem perfil FoodStrick. Contate o administrador.');
+            if (alive) {
+              setCurrentUser({ ...profile, unidade: profile.company_id === 'foodstrick-master' ? 'FoodStrick Master' : profile.company_id });
+              setIsAuthenticated(true);
+            }
+          } catch (err) {
+            if (alive) { setCurrentUser(null); setIsAuthenticated(false); setAuthError(err.message || 'Falha ao validar a sessão.'); }
+          } finally { if (alive) setAuthLoading(false); }
+        }
+        loadSession();
+        const { data: { subscription } } = supabaseClient.auth.onAuthStateChange(() => {
+          // Não consultar Supabase dentro do callback para evitar bloqueios de auth.
+          setTimeout(loadSession, 0);
+        });
+        return () => { alive = false; subscription.unsubscribe(); };
+      }, []);
 
       const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
       const [impersonatedCompany, setImpersonatedCompany] = useState(null);
@@ -551,64 +573,19 @@
       const handleLogin = async (e) => {
         e.preventDefault();
         setAuthError('');
-        const cleanUser = username.trim().toLowerCase();
-
-        if (cleanUser === 'admin' && (password === 'admin123' || password === '123')) {
-          const superAdminObj = { username: 'admin', role: 'superadmin', company_id: 'foodstrick-master', unidade: 'FoodStrick Master' };
-          localStorage.setItem('foodstrick_master_session', JSON.stringify(superAdminObj));
-          setCurrentUser(superAdminObj);
-          setIsAuthenticated(true);
-          setAbaAtiva('configuracoes');
-          setSubAbaConfig('empresas');
-          fetchCompanies();
-          return;
-        }
-
-        if (cleanUser === 'cozinha' && password === '123') {
-          let avatar = null;
-          try {
-            const { data } = await supabaseClient.from('app_users').select('avatar_url').eq('username', 'cozinha').maybeSingle();
-            if (data) avatar = data.avatar_url;
-          } catch(e){}
-
-          const legacyObj = { username: 'cozinha', role: 'operador', company_id: 'cozinha-brasileira', unidade: 'Cozinha Brasileira', avatar_url: avatar };
-          localStorage.setItem('foodstrick_master_session', JSON.stringify(legacyObj));
-          setCurrentUser(legacyObj);
-          setIsAuthenticated(true);
-          setAbaAtiva('painel');
-          return;
-        }
-
         try {
-          const { data: userData } = await supabaseClient.from('app_users').select('*').ilike('username', cleanUser).eq('password', password).maybeSingle();
-          if (userData) {
-            const { data: comp } = await supabaseClient.from('companies').select('*').eq('company_id', userData.company_id).maybeSingle();
-            if (comp && comp.status === 'bloqueado') {
-              setAuthError('Acesso bloqueado: este estabelecimento está suspenso.');
-              return;
-            }
-
-            const userObj = { 
-              username: userData.username, 
-              role: userData.role || 'operador', 
-              company_id: userData.company_id, 
-              unidade: comp ? comp.company_name : 'Minha Cozinha', 
-              avatar_url: userData.avatar_url 
-            };
-            localStorage.setItem('foodstrick_master_session', JSON.stringify(userObj));
-            setCurrentUser(userObj);
-            setIsAuthenticated(true);
-            setAbaAtiva('painel');
-            return;
-          }
-        } catch (err) {}
-
-        setAuthError('Utilizador ou palavra-passe incorretos.');
+          const { error } = await supabaseClient.auth.signInWithPassword({
+            email: username.trim(), password
+          });
+          if (error) throw error;
+          // O observador de auth carrega o perfil autorizado.
+          setPassword('');
+        } catch (err) { setAuthError(err.message || 'Falha no login.'); }
       };
 
       const handleLogout = async () => {
         if (impersonatedCompany) await handleStopImpersonation();
-        localStorage.removeItem('foodstrick_master_session');
+        await supabaseClient.auth.signOut();
         localStorage.removeItem('cache_prods');
         localStorage.removeItem('cache_lancs');
         setIsAuthenticated(false);
@@ -621,6 +598,7 @@
       };
 
       const handleStartImpersonation = async (comp) => {
+        alert("Acesso de suporte interempresa temporariamente desabilitado até implementação de autorização no servidor."); return;
         try {
           await supabaseClient.from('app_users').update({ active_support_by: currentUser.username }).eq('company_id', comp.company_id);
           setImpersonatedCompany(comp);
@@ -1027,19 +1005,11 @@
 
       const handleCreateCompanyB2B = async (e) => {
         e.preventDefault();
-        const cleanName = newCompanyName.trim();
-        let cleanSlug = newCompanySlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
-        if (!cleanSlug) cleanSlug = cleanName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-');
-
-        await supabaseClient.from('companies').insert([{ company_id: cleanSlug, company_name: cleanName, contact_phone: newCompanyPhone.trim(), status: 'ativo' }]);
-        await supabaseClient.from('app_users').insert([{ username: newCompanyAdminUser.trim().toLowerCase(), password: newCompanyAdminPass.trim(), role: 'admin', company_id: cleanSlug }]);
-
-        alert(`Restaurante "${cleanName}" registrado!`);
-        setNewCompanyName(''); setNewCompanySlug(''); setNewCompanyPhone(''); setNewCompanyAdminUser(''); setNewCompanyAdminPass('');
-        fetchCompanies();
+        alert('Cadastro temporariamente indisponível durante a migração de segurança. Use o fluxo administrativo autorizado no servidor.');
       };
 
       const handleToggleCompanyStatus = async (id, currentStatus) => {
+        alert("Alteração de status indisponível até autorização no servidor."); return;
         await supabaseClient.from('companies').update({ status: currentStatus === 'ativo' ? 'bloqueado' : 'ativo' }).eq('id', id);
         fetchCompanies();
       };
@@ -1062,8 +1032,8 @@
             
             const updatedUser = { ...currentUser, avatar_url: compressedBase64 };
             setCurrentUser(updatedUser);
-            localStorage.setItem('foodstrick_master_session', JSON.stringify(updatedUser));
-            await supabaseClient.from('app_users').update({ avatar_url: compressedBase64 }).eq('username', currentUser.username);
+            // Sessão é gerenciada pelo Supabase Auth; perfil precisa de endpoint autorizado.
+            // Atualização do avatar deve migrar para endpoint autorizado.
           };
           img.src = event.target.result;
         };
@@ -1074,8 +1044,8 @@
         if (!currentUser) return;
         const updatedUser = { ...currentUser, avatar_url: null };
         setCurrentUser(updatedUser);
-        localStorage.setItem('foodstrick_master_session', JSON.stringify(updatedUser));
-        await supabaseClient.from('app_users').update({ avatar_url: null }).eq('username', currentUser.username);
+        // Sessão é gerenciada pelo Supabase Auth; perfil precisa de endpoint autorizado.
+        // Atualização do avatar deve migrar para endpoint autorizado.
       };
 
       const isSupportSessionActive = Boolean(impersonatedCompany || adminInsideNotification);
@@ -1147,6 +1117,7 @@
       // ==========================
       // TELA DE LOGIN
       // ==========================
+      if (authLoading) return <div className="min-h-screen flex items-center justify-center text-white">Validando sessão...</div>;
       if (!isAuthenticated) {
         return (
           <div className="min-h-screen w-full flex items-center justify-center md:justify-start p-4 sm:p-6 md:p-16 lg:p-24 relative bg-cover bg-center" style={{ backgroundImage: `url("${LOGIN_BG_IMAGE}")` }}>
@@ -1164,8 +1135,8 @@
               {authError && <div className="mb-4 p-3 bg-red-950/60 border border-red-800 text-red-300 rounded-lg text-xs font-medium text-center">{authError}</div>}
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">Usuário</label>
-                  <input type="text" placeholder="admin ou cozinha" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full bg-[#202020] text-white text-base md:text-sm px-4 py-3 md:py-2.5 rounded-lg border border-[#333] focus:border-[#D95B1E] outline-none" required />
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">E-mail</label>
+                  <input type="email" autoComplete="email" placeholder="seu@email.com" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full bg-[#202020] text-white text-base md:text-sm px-4 py-3 md:py-2.5 rounded-lg border border-[#333] focus:border-[#D95B1E] outline-none" required />
                 </div>
                 <div className="relative">
                   <label className="block text-xs font-medium text-zinc-400 mb-1">Senha</label>
