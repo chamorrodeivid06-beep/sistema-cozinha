@@ -1062,21 +1062,39 @@
         }
       }, [isAuthenticated, abaAtiva, effectiveCompanyId]);
 
+      // Pedidos Online: Supabase Auth + RLS, sem senha legada.
       async function carregarPedidosOnline() {
-        if (!currentUser || !effectiveCompanyId) return;
+        if (!currentUser || !effectiveCompanyId || effectiveCompanyId === 'foodstrick-master') return;
         setPedidosLoading(true);
         setPedidosError('');
         try {
-          const { data, error } = await supabaseClient.rpc('foodstrick_list_orders_for_user', {
-            p_username: currentUser.username,
-            p_password: password,
-            p_company_id: effectiveCompanyId
-          });
-          if (error) throw error;
-          setPedidosOnline(Array.isArray(data) ? data : (data?.orders || []));
+          const { data: sessionData, error: sessionError } = await supabaseClient.auth.getUser();
+          if (sessionError || !sessionData?.user) throw new Error('Sua sessão expirou. Entre novamente no sistema.');
+          const { data: orders, error: ordersError } = await supabaseClient
+            .from('foodstrick_orders').select('*')
+            .eq('company_id', effectiveCompanyId)
+            .order('created_at', { ascending: false });
+          if (ordersError) throw ordersError;
+          const orderIds = (orders || []).map(order => order.id);
+          let items = [];
+          if (orderIds.length) {
+            // A RLS da tabela de itens verifica a empresa do pedido associado.
+            const { data: orderItems, error: itemsError } = await supabaseClient
+              .from('foodstrick_order_items').select('*').in('order_id', orderIds);
+            if (itemsError) throw itemsError;
+            items = orderItems || [];
+          }
+          const itemsByOrder = new Map();
+          for (const item of items) {
+            if (!itemsByOrder.has(item.order_id)) itemsByOrder.set(item.order_id, []);
+            itemsByOrder.get(item.order_id).push(item);
+          }
+          setPedidosOnline((orders || []).map(order => ({
+            ...order, items: itemsByOrder.get(order.id) || []
+          })));
         } catch (error) {
           console.error('Erro ao carregar pedidos online:', error);
-          setPedidosError(password ? (error.message || 'Não foi possível carregar os pedidos.') : 'Por segurança, entre novamente na sua conta para consultar os pedidos após atualizar a página.');
+          setPedidosError(error.message || 'Não foi possível carregar os pedidos.');
           setPedidosOnline([]);
         } finally {
           setPedidosLoading(false);
@@ -1084,19 +1102,26 @@
       }
 
       async function atualizarStatusPedido(pedidoId, novoStatus) {
-        if (!currentUser || !effectiveCompanyId) return;
+        if (!currentUser || !effectiveCompanyId || effectiveCompanyId === 'foodstrick-master') return;
+        const transicoes = { pending: ['accepted', 'rejected'], accepted: ['preparing'], preparing: ['ready'], ready: ['completed'] };
+        const pedido = pedidosOnline.find(p => p.id === pedidoId);
+        if (!pedido || !(transicoes[pedido.status] || []).includes(novoStatus)) {
+          setPedidosError('Transição de status inválida. Atualize os pedidos e tente novamente.');
+          return;
+        }
         setPedidoAtualizando(pedidoId);
         setPedidosError('');
         try {
-          const { data, error } = await supabaseClient.rpc('foodstrick_update_order_status_for_user', {
-            p_username: currentUser.username,
-            p_password: password,
-            p_company_id: effectiveCompanyId,
-            p_order_id: pedidoId,
-            p_status: novoStatus
-          });
+          const { data, error } = await supabaseClient.from('foodstrick_orders')
+            .update({ status: novoStatus })
+            .eq('id', pedidoId)
+            .eq('company_id', effectiveCompanyId)
+            .eq('status', pedido.status)
+            .select('id,status');
           if (error) throw error;
-          if (data?.error) throw new Error(data.error);
+          if (!data?.length) throw new Error('O pedido foi alterado ou você não tem permissão para atualizá-lo.');
+          // IMPORTANTE: concluir o pedido NÃO confirma pagamento nem gera venda automaticamente.
+          // A contabilização exige uma rotina transacional autorizada no servidor.
           await carregarPedidosOnline();
         } catch (error) {
           console.error('Erro ao atualizar pedido:', error);
@@ -1787,7 +1812,7 @@
                   <div><h1 className="text-xl sm:text-2xl font-bold text-white">Pedidos Online</h1><p className="text-xs text-zinc-400 mt-1">Pedidos enviados pelos clientes no cardápio público desta unidade.</p></div>
                   <button onClick={carregarPedidosOnline} disabled={pedidosLoading} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#252525] hover:bg-[#333] border border-[#3a3a3a] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={pedidosLoading?'animate-spin':''}><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M5.6 9a7 7 0 0 1 11.6-2L20 12M4 12l2.8 5a7 7 0 0 0 11.6-2"/></svg>{pedidosLoading?'Atualizando...':'Atualizar pedidos'}</button>
                 </header>
-                {pedidosError && <div className="mb-4 rounded-xl border border-red-900 bg-red-950/50 p-3 text-sm text-red-300">{pedidosError}{!password && <button onClick={handleLogout} className="ml-2 underline font-bold">Sair e entrar novamente</button>}</div>}
+                {pedidosError && <div className="mb-4 rounded-xl border border-red-900 bg-red-950/50 p-3 text-sm text-red-300">{pedidosError}</div>}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
                   <div className="rounded-xl border border-[#2b2b2b] bg-[#161616] p-4"><p className="text-xs text-zinc-400">Total de pedidos</p><p className="text-2xl font-black text-white mt-1">{pedidosOnline.length}</p></div>
                   <div className="rounded-xl border border-amber-900/60 bg-[#161616] p-4"><p className="text-xs text-zinc-400">Pendentes</p><p className="text-2xl font-black text-amber-300 mt-1">{pedidosOnline.filter(p=>p.status==='pending').length}</p></div>
