@@ -100,11 +100,8 @@
               setClickRipples(prev => [...prev, { id: rippleId, x: posX, y: posY }]);
               setTimeout(() => setClickRipples(prev => prev.filter(r => r.id !== rippleId)), 800);
 
-              const el = document.elementFromPoint(posX, posY);
-              if (el) {
-                el.click();
-                if (['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName)) el.focus();
-              }
+              // Segurança: cliques remotos são apenas indicadores visuais.
+              // Nunca acionar botões ou inputs a partir de broadcasts de cursor.
             }
           })
           .on('broadcast', { event: 'page-scroll' }, ({ payload }) => {
@@ -499,6 +496,7 @@
       const [pedidosLoading, setPedidosLoading] = useState(false);
       const [pedidosError, setPedidosError] = useState('');
       const [pedidoAtualizando, setPedidoAtualizando] = useState(null);
+      const [pagamentoAtualizando, setPagamentoAtualizando] = useState(null);
       const [pedidoExpandido, setPedidoExpandido] = useState(null);
       const [filtroPedidos, setFiltroPedidos] = useState('todos');
 
@@ -1128,6 +1126,32 @@
           setPedidosError(error.message || 'Não foi possível atualizar o status do pedido.');
         } finally {
           setPedidoAtualizando(null);
+        }
+      }
+
+      // Confirmação MANUAL: somente após verificar o recebimento real.
+      // A RPC aplica autorização, isolamento por empresa e registro transacional.
+      async function confirmarPagamentoManual(pedido) {
+        if (!currentUser || !effectiveCompanyId || effectiveCompanyId === 'foodstrick-master') return;
+        if (pedido.company_id !== effectiveCompanyId) return setPedidosError('Pedido não pertence a esta empresa.');
+        if (pedido.payment_status === 'paid' || pedido.financial_launch_id) return;
+        if (['rejected', 'cancelled', 'canceled', 'recusado', 'cancelado'].includes(String(pedido.status).toLowerCase())) return;
+        const valor = Number(pedido.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const confirmado = window.confirm(`Você conferiu que o restaurante RECEBEU ${valor} do pedido #${String(pedido.id).slice(0, 8).toUpperCase()}?\n\nSó confirme depois de verificar o dinheiro, a aprovação do cartão ou o Pix no extrato. Esta ação registra uma venda no financeiro.`);
+        if (!confirmado) return;
+        setPagamentoAtualizando(pedido.id);
+        setPedidosError('');
+        try {
+          const { data, error } = await supabaseClient.rpc('foodstrick_confirm_manual_payment', { p_order_id: pedido.id });
+          if (error) throw error;
+          const resultado = Array.isArray(data) ? data[0] : data;
+          await Promise.all([carregarPedidosOnline(), carregarTudoEmParalelo(effectiveCompanyId)]);
+          alert(resultado?.already_recorded ? 'Pagamento já registrado anteriormente. Nenhuma venda duplicada foi criada.' : 'Pagamento confirmado e venda registrada em Lançamentos!');
+        } catch (error) {
+          console.error('Erro ao confirmar pagamento manual:', error);
+          setPedidosError(error.message || 'Não foi possível confirmar o pagamento. Nenhuma confirmação foi assumida.');
+        } finally {
+          setPagamentoAtualizando(null);
         }
       }
 
@@ -1828,7 +1852,7 @@
                   return <article key={p.id} className="rounded-xl border border-[#2b2b2b] bg-[#161616] overflow-hidden">
                     <div className="p-4 sm:p-5"><div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-white">Pedido #{String(p.id).slice(0,8).toUpperCase()}</h2><span className={`rounded-full border px-2 py-1 text-[10px] font-bold ${statusPedidoClass(p.status)}`}>{statusPedidoLabel(p.status)}</span></div><p className="text-xs text-zinc-500 mt-1">{created}</p><p className="text-sm text-zinc-200 mt-3 font-semibold">{p.customer_name}</p><p className="text-xs text-zinc-400 mt-1">{p.customer_phone}</p></div><div className="sm:text-right"><p className="text-xl font-black text-[#F28B50]">R$ {Number(p.total||0).toFixed(2).replace('.',',')}</p><p className="text-xs text-zinc-400 mt-1">{p.order_type==='delivery'?'Entrega':'Retirada'} · {p.payment_method||'Pagamento não informado'}</p></div></div>
                     {p.order_type==='delivery'&&p.delivery_address&&<p className="text-xs text-zinc-400 mt-3">Endereço: {p.delivery_address}</p>}{p.notes&&<p className="text-xs text-zinc-400 mt-2">Observações: {p.notes}</p>}
-                    <div className="flex flex-wrap items-center gap-2 mt-4"><button onClick={()=>setPedidoExpandido(expanded?null:p.id)} className="rounded-lg border border-[#3a3a3a] bg-[#242424] px-3 py-2 text-xs font-bold text-white">{expanded?'Ocultar itens':'Ver itens'} ({(p.items||[]).length})</button>{p.status==='pending'&&<><button disabled={pedidoAtualizando===p.id} onClick={()=>atualizarStatusPedido(p.id,'accepted')} className="rounded-lg bg-emerald-700 hover:bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Aceitar pedido</button><button disabled={pedidoAtualizando===p.id} onClick={()=>atualizarStatusPedido(p.id,'rejected')} className="rounded-lg bg-red-950 hover:bg-red-900 border border-red-900 px-3 py-2 text-xs font-bold text-red-300 disabled:opacity-50">Recusar</button></>}{p.status==='accepted'&&<button disabled={pedidoAtualizando===p.id} onClick={()=>atualizarStatusPedido(p.id,'preparing')} className="rounded-lg bg-purple-800 hover:bg-purple-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Iniciar preparo</button>}{p.status==='preparing'&&<button disabled={pedidoAtualizando===p.id} onClick={()=>atualizarStatusPedido(p.id,'ready')} className="rounded-lg bg-blue-800 hover:bg-blue-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Marcar como pronto</button>}{p.status==='ready'&&<button disabled={pedidoAtualizando===p.id} onClick={()=>atualizarStatusPedido(p.id,'completed')} className="rounded-lg bg-emerald-700 hover:bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Concluir pedido</button>}</div>
+                    <div className="flex flex-wrap items-center gap-2 mt-4"><button onClick={()=>setPedidoExpandido(expanded?null:p.id)} className="rounded-lg border border-[#3a3a3a] bg-[#242424] px-3 py-2 text-xs font-bold text-white">{expanded?'Ocultar itens':'Ver itens'} ({(p.items||[]).length})</button><span className={`rounded-lg border px-3 py-2 text-xs font-bold ${p.payment_status==='paid'?'border-emerald-800 bg-emerald-950 text-emerald-300':'border-amber-900 bg-amber-950/40 text-amber-300'}`}>{p.payment_status==='paid'?'Pagamento recebido':'Pagamento pendente'}</span>{p.payment_status!=='paid'&&!p.financial_launch_id&&!['rejected','cancelled','canceled','recusado','cancelado'].includes(String(p.status).toLowerCase())&&<button type="button" disabled={pagamentoAtualizando===p.id||pedidoAtualizando===p.id} onClick={()=>confirmarPagamentoManual(p)} className="rounded-lg bg-[#D95B1E] hover:bg-[#c34e17] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{pagamentoAtualizando===p.id?'Confirmando...':'Confirmar recebimento'}</button>}{p.status==='pending'&&<><button disabled={pedidoAtualizando===p.id} onClick={()=>atualizarStatusPedido(p.id,'accepted')} className="rounded-lg bg-emerald-700 hover:bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Aceitar pedido</button><button disabled={pedidoAtualizando===p.id} onClick={()=>atualizarStatusPedido(p.id,'rejected')} className="rounded-lg bg-red-950 hover:bg-red-900 border border-red-900 px-3 py-2 text-xs font-bold text-red-300 disabled:opacity-50">Recusar</button></>}{p.status==='accepted'&&<button disabled={pedidoAtualizando===p.id} onClick={()=>atualizarStatusPedido(p.id,'preparing')} className="rounded-lg bg-purple-800 hover:bg-purple-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Iniciar preparo</button>}{p.status==='preparing'&&<button disabled={pedidoAtualizando===p.id} onClick={()=>atualizarStatusPedido(p.id,'ready')} className="rounded-lg bg-blue-800 hover:bg-blue-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Marcar como pronto</button>}{p.status==='ready'&&<button disabled={pedidoAtualizando===p.id} onClick={()=>atualizarStatusPedido(p.id,'completed')} className="rounded-lg bg-emerald-700 hover:bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Concluir pedido</button>}</div>
                     {expanded&&<div className="mt-4 rounded-lg border border-[#2b2b2b] bg-[#1c1c1c] p-3">{!(p.items||[]).length?<p className="text-xs text-zinc-500">Itens não retornados pelo banco.</p>:<div className="space-y-2">{p.items.map((it,i)=><div key={it.id||i} className="flex justify-between gap-3 text-sm"><span className="text-zinc-300">{it.quantity} × {it.product_name}</span><span className="text-white font-semibold">R$ {Number(it.line_total||0).toFixed(2).replace('.',',')}</span></div>)}<div className="border-t border-[#333] pt-2 flex justify-between font-black"><span>Total</span><span className="text-[#F28B50]">R$ {Number(p.total||0).toFixed(2).replace('.',',')}</span></div></div>}</div>}
                     </div></article>;
                 })}</div>)}
